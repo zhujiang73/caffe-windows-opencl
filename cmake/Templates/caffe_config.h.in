@@ -1,0 +1,17 @@
+#ifndef CAFFE_CONFIG_HPP_
+#define CAFFE_CONFIG_HPP_
+
+/* Sources directory */
+#define SOURCE_FOLDER "${PROJECT_SOURCE_DIR}"
+
+/* Binaries directory */
+#define BINARY_FOLDER "${PROJECT_BINARY_DIR}"
+
+/* Test device */
+#define CUDA_TEST_DEVICE ${CUDA_TEST_DEVICE}
+
+#define CMAKE_SOURCE_DIR "src/"
+#define EXAMPLES_SOURCE_DIR "examples/"
+#define CMAKE_EXT ""
+
+#endif  // CAFFE_CONFIG_HPP_
