@@ -35,7 +35,7 @@ class DropoutLayer : public NeuronLayer<Dtype> {
       : NeuronLayer<Dtype>(param) {}
 
   virtual ~DropoutLayer() {
-     LOG(INFO) << "caffe ~DropoutLayer debug ...";  
+     //LOG(INFO) << "caffe ~DropoutLayer debug ...";  
   }
   
 

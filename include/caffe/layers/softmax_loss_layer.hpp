@@ -55,7 +55,7 @@ class SoftmaxWithLossLayer : public LossLayer<Dtype> {
       : LossLayer<Dtype>(param) {}
 
   virtual ~SoftmaxWithLossLayer() {
-     LOG(INFO) << "caffe ~SoftmaxWithLossLayer debug ...";  
+     //LOG(INFO) << "caffe ~SoftmaxWithLossLayer debug ...";  
   }
 
   virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,

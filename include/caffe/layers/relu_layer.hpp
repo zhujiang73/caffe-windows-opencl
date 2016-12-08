@@ -28,7 +28,7 @@ class ReLULayer : public NeuronLayer<Dtype> {
       : NeuronLayer<Dtype>(param) {}
 
   virtual ~ReLULayer() {
-     LOG(INFO) << "caffe ~ReLULayer debug ...";  
+     //LOG(INFO) << "caffe ~ReLULayer debug ...";  
   }
 
   virtual inline const char* type() const { return "ReLU"; }

@@ -66,7 +66,7 @@ class ConvolutionLayer : public BaseConvolutionLayer<Dtype> {
   }
 
   virtual ~ConvolutionLayer() {
-     LOG(INFO) << "caffe ~ConvolutionLayer debug ...";  
+     //LOG(INFO) << "caffe ~ConvolutionLayer debug ...";  
   }
 
   virtual inline const char* type() const {

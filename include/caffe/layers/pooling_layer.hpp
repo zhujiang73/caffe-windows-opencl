@@ -22,7 +22,7 @@ class PoolingLayer : public Layer<Dtype> {
   }
 
   virtual ~PoolingLayer() {
-     LOG(INFO) << "caffe ~PoolingLayer debug ...";  
+     //LOG(INFO) << "caffe ~PoolingLayer debug ...";  
   }
 
   virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,

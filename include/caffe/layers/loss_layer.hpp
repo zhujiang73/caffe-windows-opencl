@@ -26,7 +26,7 @@ class LossLayer : public Layer<Dtype> {
      : Layer<Dtype>(param) {}
 
   virtual ~LossLayer() {
-     LOG(INFO) << "caffe ~LossLayer debug ...";  
+     //LOG(INFO) << "caffe ~LossLayer debug ...";  
   }
 
   virtual void LayerSetUp(

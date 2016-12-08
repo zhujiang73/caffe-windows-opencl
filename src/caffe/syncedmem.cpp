@@ -189,9 +189,6 @@ inline void SyncedMemory::to_cpu() {
 }
 
 inline void SyncedMemory::to_gpu() {
-
-    //LOG(INFO) << " SyncedMemory::to_gpu  debug01"; return;
-
 #ifndef CPU_ONLY
   switch (head_) {
     case UNINITIALIZED: {

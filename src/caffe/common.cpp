@@ -264,9 +264,9 @@ Caffe::~Caffe() {
   // Make sure all device contexts and
   // dependent memory blocks are freed properly
   if (this == global_instance_) {
-      LOG(INFO) << "OpenCL  devices clear debug01:  ...   " << devices_.size();
+      //LOG(INFO) << "OpenCL  devices clear debug01:  ...   " << devices_.size();
       devices_.clear();
-      LOG(INFO) << "OpenCL  devices clear debug02:  ...   " << devices_.size();
+      //LOG(INFO) << "OpenCL  devices clear debug02:  ...   " << devices_.size();
   }
 #ifdef USE_CUDA
   if (cublas_handle_)

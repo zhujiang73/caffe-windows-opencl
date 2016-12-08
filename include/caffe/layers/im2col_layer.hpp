@@ -23,7 +23,7 @@ class Im2colLayer : public Layer<Dtype> {
       : Layer<Dtype>(param) {}
 
   virtual ~Im2colLayer() {
-     LOG(INFO) << "caffe ~Im2colLayer debug ...";  
+     //LOG(INFO) << "caffe ~Im2colLayer debug ...";  
   }
 
   virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,

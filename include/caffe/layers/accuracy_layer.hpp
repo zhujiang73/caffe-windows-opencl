@@ -30,7 +30,7 @@ class AccuracyLayer : public Layer<Dtype> {
       : Layer<Dtype>(param) {}
 
   virtual ~AccuracyLayer() {
-     LOG(INFO) << "caffe ~AccuracyLayer debug ...";  
+     //LOG(INFO) << "caffe ~AccuracyLayer debug ...";  
   }
 
   virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,

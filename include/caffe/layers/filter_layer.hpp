@@ -22,7 +22,7 @@ class FilterLayer : public Layer<Dtype> {
       : Layer<Dtype>(param) {}
 
   virtual ~FilterLayer() {
-     LOG(INFO) << "caffe ~FilterLayer debug ...";  
+     //LOG(INFO) << "caffe ~FilterLayer debug ...";  
   }
 
   virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,

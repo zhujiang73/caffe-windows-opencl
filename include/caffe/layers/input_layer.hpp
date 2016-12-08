@@ -22,7 +22,7 @@ class InputLayer : public Layer<Dtype> {
       : Layer<Dtype>(param) {}
 
   virtual ~InputLayer() {
-     LOG(INFO) << "caffe ~InputLayer debug ...";  
+     //LOG(INFO) << "caffe ~InputLayer debug ...";  
   }
 
   virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
