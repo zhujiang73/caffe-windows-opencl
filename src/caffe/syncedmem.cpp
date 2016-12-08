@@ -89,22 +89,22 @@ SyncedMemory::~SyncedMemory() {
     } else {
 #ifdef USE_GREENTEA
       // Free device memory
-      //LOG(INFO)<< "OpenCL  quit device :  ...   " << device_->id();
-      viennacl::ocl::context &ctx = viennacl::ocl::get_context(device_->id());
-      ctx.get_queue().finish();
-      CHECK_EQ(CL_SUCCESS, clReleaseMemObject(cl_gpu_mem_))
-          << "OpenCL memory corruption";
+      //LOG(INFO)<< "OpenCL  quit device debug01:  ...   " << device_->id();  
+      //viennacl::ocl::context &ctx = viennacl::ocl::get_context(device_->id());
+      //ctx.get_queue().finish();
+      //CHECK_EQ(CL_SUCCESS, clReleaseMemObject(cl_gpu_mem_))
+      //    << "OpenCL memory corruption";
       gpu_ptr_ = nullptr;
       cl_gpu_mem_ = nullptr;
-      ctx.get_queue().finish();
-      //LOG(INFO)<< "OpenCL  quit  queue :  ...   " << device_->id();
+      //ctx.get_queue().finish();
+      //LOG(INFO)<< "OpenCL  quit device debug02 :  ...   " << device_->id();
       if (own_zero_copy_data_ && own_cpu_data_ && cpu_ptr_) {
         CaffeFreeHost(cpu_ptr_, device_);
         cpu_ptr_ = nullptr;
       }
-      //LOG(INFO)<< "OpenCL  DecreaseMemoryUsage 01:  ...   " << device_->id();
+      //LOG(INFO)<< "OpenCL  quit device debug03:  ...   " << device_->id();
       device_->DecreaseMemoryUsage(size_);
-      //LOG(INFO)<< "OpenCL  DecreaseMemoryUsage 02:  ...   " << device_->id();
+      //LOG(INFO)<< "OpenCL  quit device debug04:  ...   " << device_->id();
 #endif  // USE_GREENTEA
     }
   }
@@ -189,6 +189,9 @@ inline void SyncedMemory::to_cpu() {
 }
 
 inline void SyncedMemory::to_gpu() {
+
+    //LOG(INFO) << " SyncedMemory::to_gpu  debug01"; return;
+
 #ifndef CPU_ONLY
   switch (head_) {
     case UNINITIALIZED: {

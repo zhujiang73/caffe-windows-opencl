@@ -305,9 +305,9 @@ void Net<Dtype>::Init(const NetParameter& in_param) {
     LOG(INFO) << "Memory required for data: " << memory_used_ * sizeof(Dtype);
   }
 
-  for (int n=0; n<layers_.size(); n++) {
-	LOG(INFO) << layers_[n]->type();
-  }
+  //for (int n=0; n<layers_.size(); n++) {
+	//LOG(INFO) << layers_[n]->type();
+  //}
   
   //this->set_debug_info(true);
 }
@@ -614,6 +614,7 @@ const vector<Blob<Dtype>*>& Net<Dtype>::Forward(Dtype* loss) {
     *loss = ForwardFromTo(0, layers_.size() - 1);
   } else {
     ForwardFromTo(0, layers_.size() - 1);
+    //LOG(INFO) << "Forward debug layers_.size " << layers_.size();
   }
   return net_output_blobs_;
 }

@@ -20,6 +20,7 @@ void greentea_im2col_gpu(viennacl::ocl::program *prog,
                          const int_tp stride_h, const int_tp stride_w,
                          const int_tp dilation_h, const int_tp dilation_w,
                          cl_mem data_col, const int_tp data_col_off) {
+
   int_tp height_col = (height + 2 * pad_h - (dilation_h * (kernel_h - 1) + 1))
       / stride_h + 1;
   int_tp width_col = (width + 2 * pad_w - (dilation_w * (kernel_w - 1) + 1))

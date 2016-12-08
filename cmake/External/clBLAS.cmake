@@ -26,9 +26,9 @@ if (NOT __clBLAS_INCLUDED) # guard against multiple includes
       )
 
     set(clBLAS_FOUND TRUE)
-    set(clBLAS_INCLUDE_DIRS ${CMAKE_BINARY_DIR}/external/clBLAS-install/include)
+    set(clBLAS_INCLUDE_DIRS ${clBLAS_INSTALL}/include)
     #set(clBLAS_LIBRARIES ${CMAKE_BINARY_DIR}/external/clBLAS-install/lib/import/libclBLAS.dll.a)
-    set(clBLAS_LIBRARIES ${CMAKE_BINARY_DIR}/external/clBLAS-install/lib64/import/libclBLAS.dll.a)
+    set(clBLAS_LIBRARIES ${clBLAS_INSTALL}/lib64/import/libclBLAS.dll.a)
     set(clBLAS_EXTERNAL TRUE)
 
     list(APPEND external_project_dependencies clBLAS)
