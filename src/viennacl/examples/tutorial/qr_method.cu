@@ -1,1 +1,0 @@
-qr_method.cpp
