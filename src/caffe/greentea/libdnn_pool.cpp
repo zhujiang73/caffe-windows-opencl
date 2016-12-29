@@ -14,6 +14,7 @@ namespace caffe {
 
 template<typename Dtype>
 LibDNNPool<Dtype>::LibDNNPool(LibDNNPoolConfig config) {
+  config_ = config;
   LibDNN<Dtype>::dev_ptr_ = config.dev_ptr;
   LibDNN<Dtype>::fast_unsafe_math_ = config.fast_unsafe_math;
   int_tp dims = config.in_shape.size();
@@ -22,7 +23,7 @@ LibDNNPool<Dtype>::LibDNNPool(LibDNNPoolConfig config) {
   num_axes_ = spatial_dims;
 
   pool_method_ = config.pool_method;
-  pool_bw_algo_ = config.pool_bw_algo;
+  bwalgo_ = config.bwalgo;
   use_top_mask_ = config.use_top_mask;
 
   skip_range_check_ = true;
@@ -50,6 +51,11 @@ LibDNNPool<Dtype>::LibDNNPool(LibDNNPoolConfig config) {
 
   GenerateKernels();
   LibDNN<Dtype>::CompileKernels();
+}
+
+template<typename Dtype>
+const LibDNNPoolConfig LibDNNPool<Dtype>::get_config() {
+  return config_;
 }
 
 
@@ -164,7 +170,9 @@ std::string LibDNNPool<Dtype>::generate_bw_defs() {
 
   // Number of spatial axes
   LibDNN<Dtype>::add_def(ss, "v_nax", num_axes_);
-
+  for (int_tp i = 0; i < kernel_shape_.size(); ++i) {
+    LibDNN<Dtype>::add_def(ss, "v_k_" + std::to_string(i), kernel_shape_[i]);
+  }
   for (int_tp i = 0; i < pad_.size(); ++i) {
     LibDNN<Dtype>::add_def(ss, "v_p_" + std::to_string(i), pad_[i]);
   }
@@ -174,6 +182,17 @@ std::string LibDNNPool<Dtype>::generate_bw_defs() {
   for (int_tp i = 0; i < dilation_.size(); ++i) {
     LibDNN<Dtype>::add_def(ss, "v_d_" + std::to_string(i), dilation_[i]);
   }
+
+  int_tp imsi = 1;
+  int_tp imso = 1;
+  for (int_tp i = 0; i < im_in_shape_.size(); ++i) {
+    LibDNN<Dtype>::add_def(ss, "v_imsi_" + std::to_string(i), im_in_shape_[i]);
+    imsi *= im_in_shape_[i];
+    LibDNN<Dtype>::add_def(ss, "v_imso_" + std::to_string(i), im_out_shape_[i]);
+    imso *= im_out_shape_[i];
+  }
+  LibDNN<Dtype>::add_def(ss, "v_imsi", imsi);
+  LibDNN<Dtype>::add_def(ss, "v_imso", imso);
 
   return ss.str();
 }
@@ -242,7 +261,7 @@ std::string LibDNNPool<Dtype>::generate_fw_kernels(std::string name,
       ss << "Dtype cumsum = FLT_MIN;" << std::endl;
       ss << "Dtype cumvalues = 0;" << std::endl;
     } else {
-      ss << "__global int_tp* rand_ptr = rand_idx + get_global_id(1) * v_imso;"
+      ss << "__global Dtype* rand_ptr = rand_idx + get_global_id(1) * v_imso;"
          << std::endl;
       ss << "Dtype val = 0;" << std::endl;
       ss << "Dtype cumsum = 0;" << std::endl;
@@ -260,7 +279,7 @@ std::string LibDNNPool<Dtype>::generate_fw_kernels(std::string name,
   if (pool_method_ == LIBDNN_POOLING_METHOD_AVE) {
     int_tp ave = std::accumulate(kernel_shape_.begin(),
                                  kernel_shape_.end(),
-                                  1, std::multiplies<int>());
+                                  1, std::multiplies<int_tp>());
     ss << "int_tp ave = " << ave << ";" << std::endl;
   }
 
@@ -289,11 +308,13 @@ std::string LibDNNPool<Dtype>::generate_fw_kernels(std::string name,
           pad_guard = true;
         }
         if (d_iter[i] * dilation_[i] >=
-            ((kernel_shape_[i] - 1) * dilation_[i] + 1) - pad_[i]) {
+            ((kernel_shape_[i] - 1) * dilation_[i] + 1) - pad_[i] ||
+            (im_out_shape_[i] - 1) * stride_[i] + d_iter[i]
+                         * dilation_[i] - pad_[i] >= im_in_shape_[i] ) {
           pad_guard = true;
         }
         if ((im_out_shape_[i] - 1) * stride_[i] + d_iter[i]
-             * dilation_[i] - pad_[i] >= im_in_shape_[i] + pad_[i]) {
+             * dilation_[i] - pad_[i] >= im_in_shape_[i]) {
           overspill_guard = true;
         }
       }
@@ -307,13 +328,14 @@ std::string LibDNNPool<Dtype>::generate_fw_kernels(std::string name,
       if (pad_guard || overspill_guard) {
         for (int_tp i = 0; i < num_axes_; ++i) {
           if (d_iter[i] * dilation_[i] < pad_[i]) {
-            ss << "idx_" << i << " >= 0 && ";
+            ss << "idx_" << i << " >= -" << (d_iter[i] * dilation_[i])
+               << " && ";
           }
           if ((d_iter[i] * dilation_[i] >= ((kernel_shape_[i] - 1)
               * dilation_[i] + 1) - pad_[i]) ||
               ((im_out_shape_[i] - 1) * stride_[i]
               + d_iter[i] * dilation_[i] - pad_[i]
-              >= im_in_shape_[i] + pad_[i])) {
+              >= im_in_shape_[i])) {
             ss << "idx_" << i << " < v_imsi_" << i << " - "
                << (d_iter[i] * dilation_[i]) << " && ";
           }
@@ -334,20 +356,21 @@ std::string LibDNNPool<Dtype>::generate_fw_kernels(std::string name,
           ss << "true) {" << std::endl;
         }
         ss << "val += in_ptr[" << kernel_offset << "];" << std::endl;
+        if (pad_guard || overspill_guard) {
+          ss << "}" << std::endl;
+        }
         if (overspill_guard) {
           ss << "if (";
           for (int_tp i = 0; i < num_axes_; ++i) {
             if ((im_out_shape_[i] - 1) * stride_[i]
                 + d_iter[i] * dilation_[i] - pad_[i]
-                >= im_in_shape_[i] + pad_[i]) {
-              ss << "idx_" << i << " >= v_imsi_" << i << " + "
-                 << pad_[i] << " && ";
+                >= im_in_shape_[i]) {
+              ss << "idx_" << i << " + " << d_iter[i] * dilation_[i]
+                 << " >= v_imsi_" << i << " + "
+                 << pad_[i] << " || ";
             }
           }
-          ss << "true) {--ave;}" << std::endl;
-        }
-        if (pad_guard || overspill_guard) {
-          ss << "}" << std::endl;
+          ss << "false) {--ave;}" << std::endl;
         }
       }
       if (pool_method_ == LIBDNN_POOLING_METHOD_STO) {
@@ -443,7 +466,8 @@ std::string LibDNNPool<Dtype>::generate_bw_kernels(std::string name) {
   ss << "int_tp channels, ";
   ss << "int_tp batch_size";
   ss << ") {" << std::endl;
-  if (pool_bw_algo_ == LIBDNN_POOLING_BW_ALGO_ATOMIC) {
+  if (bwalgo_ == LIBDNN_POOLING_BW_ALGO_ATOMIC) {
+    // Atomic kernel
     ss << "int_tp in_idx = get_global_id(0);" << std::endl;
     ss << "if (get_global_id(1) >= channels * batch_size) {return;}"
        << std::endl;
@@ -456,14 +480,14 @@ std::string LibDNNPool<Dtype>::generate_bw_kernels(std::string name) {
       ss << "idx_0 /= v_imso_" << i << ";" << std::endl;
     }
     ss << "if (idx_0 >= v_imso_0) {return;}" << std::endl;
-    ss << "idx_0 = idx_0 * v_s_0 - v_p_0;" << std::endl;
-    ss << "int_tp out_idx = idx_0;" << std::endl;
-    for (int_tp i = 1; i < num_axes_; ++i) {
-      ss << "out_idx = out_idx * v_imsi_" << i
-         << " + " << "idx_" << i << ";" << std::endl;
-    }
 
     if (pool_method_ == LIBDNN_POOLING_METHOD_AVE) {
+      ss << "idx_0 = idx_0 * v_s_0 - v_p_0;" << std::endl;
+      ss << "int_tp out_idx = idx_0;" << std::endl;
+      for (int_tp i = 1; i < num_axes_; ++i) {
+        ss << "out_idx = out_idx * v_imsi_" << i
+           << " + " << "idx_" << i << ";" << std::endl;
+      }
       ss << "__global Dtype* out_ptr = bottom_diff "
          << "+ get_global_id(1) * v_imsi + out_idx;" << std::endl;
     } else {
@@ -489,7 +513,6 @@ std::string LibDNNPool<Dtype>::generate_bw_kernels(std::string name) {
     }
 
     std::vector<int_tp> d_iter;
-    int_tp curr_idx = 0;
 
     for (int_tp i = 0; i < kernel_shape_.size(); ++i) {
       d_iter.push_back(0);
@@ -498,7 +521,7 @@ std::string LibDNNPool<Dtype>::generate_bw_kernels(std::string name) {
     if (pool_method_ == LIBDNN_POOLING_METHOD_AVE) {
       int_tp ave = std::accumulate(kernel_shape_.begin(),
                                    kernel_shape_.end(),
-                                    1, std::multiplies<int>());
+                                    1, std::multiplies<int_tp>());
       ss << "int_tp ave = " << ave << ";" << std::endl;
       ss << "Dtype val = in_ptr[0];" << std::endl;
     }
@@ -526,56 +549,59 @@ std::string LibDNNPool<Dtype>::generate_bw_kernels(std::string name) {
             pad_guard = true;
           }
           if (d_iter[i] * dilation_[i] >=
-              ((kernel_shape_[i] - 1) * dilation_[i] + 1) - pad_[i]) {
+              ((kernel_shape_[i] - 1) * dilation_[i] + 1) - pad_[i] ||
+              (im_out_shape_[i] - 1) * stride_[i] + d_iter[i]
+                           * dilation_[i] - pad_[i] >= im_in_shape_[i] ) {
             pad_guard = true;
           }
           if ((im_out_shape_[i] - 1) * stride_[i] + d_iter[i]
-               * dilation_[i] - pad_[i] >= im_in_shape_[i] + pad_[i]) {
+               * dilation_[i] - pad_[i] >= im_in_shape_[i]) {
             overspill_guard = true;
           }
         }
 
-        if (((ave_idx == 1) && pad_guard) || overspill_guard) {
+        if ((ave_idx == 1) && (pad_guard || overspill_guard)) {
           ss << "if (";
         }
-        if (((ave_idx == 1) && pad_guard) || overspill_guard) {
+        if ((ave_idx == 1) && (pad_guard || overspill_guard)) {
           for (int_tp i = 0; i < num_axes_; ++i) {
             if (d_iter[i] * dilation_[i] < pad_[i]) {
-              ss << "idx_" << i << " >= 0 && ";
+              ss << "idx_" << i << " >= -" << (d_iter[i] * dilation_[i])
+                 << " && ";
             }
             if ((d_iter[i] * dilation_[i] >= ((kernel_shape_[i] - 1)
                 * dilation_[i] + 1) - pad_[i]) ||
                 ((im_out_shape_[i] - 1) * stride_[i]
                 + d_iter[i] * dilation_[i] - pad_[i]
-                >= im_in_shape_[i] + pad_[i])) {
+                >= im_in_shape_[i])) {
               ss << "idx_" << i << " < v_imsi_" << i << " - "
                  << (d_iter[i] * dilation_[i]) << " && ";
             }
           }
         }
         if (pool_method_ == LIBDNN_POOLING_METHOD_AVE) {
-          if (((ave_idx == 1) && pad_guard) || overspill_guard) {
+          if ((ave_idx == 1) && (pad_guard || overspill_guard)) {
             ss << "true) {" << std::endl;
           }
           if (ave_idx == 1) {
             ss << "atomicAdd((&out_ptr[" << kernel_offset << "]), val);"
                << std::endl;
-          } else {
-            if (overspill_guard) {
-              ss << "if (";
-              for (int_tp i = 0; i < num_axes_; ++i) {
-                if ((im_out_shape_[i] - 1) * stride_[i]
-                    + d_iter[i] * dilation_[i] - pad_[i]
-                    >= im_in_shape_[i] + pad_[i]) {
-                  ss << "idx_" << i << " >= v_imsi_" << i << " + "
-                     << pad_[i] << " && ";
-                }
-              }
-              ss << "true) {--ave;}" << std::endl;
-            }
           }
-          if (((ave_idx == 1) && pad_guard) || overspill_guard) {
+          if ((ave_idx == 1) && (pad_guard || overspill_guard)) {
             ss << "}" << std::endl;
+          }
+          if (overspill_guard && ave_idx == 0) {
+            ss << "if (";
+            for (int_tp i = 0; i < num_axes_; ++i) {
+              if ((im_out_shape_[i] - 1) * stride_[i]
+                  + d_iter[i] * dilation_[i] - pad_[i]
+                  >= im_in_shape_[i]) {
+                ss << "idx_" << i << " + " << d_iter[i] * dilation_[i]
+                   << " >= v_imsi_" << i << " + "
+                   << pad_[i] << " || ";
+              }
+            }
+            ss << "false) {--ave;}" << std::endl;
           }
         }
 
@@ -591,19 +617,158 @@ std::string LibDNNPool<Dtype>::generate_bw_kernels(std::string name) {
         }
       } while (incremented);
     }
-
     if (pool_method_ == LIBDNN_POOLING_METHOD_MAX) {
+      ss << "if (mask_ptr[0] >= 0 && mask_ptr[0] < v_imsi) {" << std::endl;
       ss << "atomicAdd(&out_ptr[(int_tp)(mask_ptr[0])], "
          << "in_ptr[0]);" << std::endl;
+      ss << "}" << std::endl;
     }
     if (pool_method_ == LIBDNN_POOLING_METHOD_STO) {
+      ss << "if (mask_ptr[0] >= 0 && mask_ptr[0] < v_imsi) {" << std::endl;
       ss << "atomicAdd(&out_ptr[(int_tp)(rand_ptr[0])], "
          << "in_ptr[0]);" << std::endl;
+      ss << "}" << std::endl;
     }
 
   } else {
-    // TODO: Deterministic backward kernel variant
-  }
+    // Direct, deterministic kernel
+    ss << "int_tp d_start[" << num_axes_ << "];" << std::endl;
+    ss << "int_tp d_end[" << num_axes_ << "];" << std::endl;
+    ss << "int_tp d_iter[" << num_axes_ << "];" << std::endl;
+
+    ss << "int_tp out_idx = get_global_id(0);" << std::endl;
+    ss << "int_tp idx_0 = get_global_id(0);" << std::endl;
+    ss << "if (get_global_id(1) >= channels * batch_size) {return;}"
+       << std::endl;
+
+    for (int_tp i = num_axes_ - 1; i >= 1; --i) {
+      ss << "int_tp idx_" << i << " = (idx_0 % v_imsi_" << i << ");"
+         << std::endl;
+      ss << "idx_0 /= v_imsi_" << i << ";" << std::endl;
+    }
+    ss << "if (idx_0 >= v_imsi_0) {return;}" << std::endl;
+
+    if (pool_method_ == LIBDNN_POOLING_METHOD_AVE) {
+      ss << "__global Dtype* out_ptr = bottom_diff "
+         << "+ get_global_id(1) * v_imsi + out_idx;" << std::endl;
+    } else {
+      ss << "__global Dtype* out_ptr = bottom_diff "
+         << "+ get_global_id(1) * v_imsi + out_idx;" << std::endl;
+    }
+    ss << "__global const Dtype* in_ptr = top_diff "
+       << "+ get_global_id(1) * v_imso;" << std::endl;
+
+    if (pool_method_ == LIBDNN_POOLING_METHOD_MAX) {
+      if (use_top_mask_) {
+        ss << "__global const Dtype* mask_ptr = top_mask "
+           << "+ get_global_id(1) * v_imso;" << std::endl;
+      } else {
+        ss << "__global const int_tp* mask_ptr = mask "
+           << "+ get_global_id(1) * v_imso;" << std::endl;
+      }
+    }
+
+    if (pool_method_ == LIBDNN_POOLING_METHOD_STO) {
+      ss << "__global const Dtype* rand_ptr = rand_idx "
+         << "+ get_global_id(1) * v_imso;" << std::endl;
+    }
+
+    for (int_tp i = 0; i < num_axes_; ++i) {
+      ss << "d_start[" << i << "] = (idx_" << i << " + v_p_" << i << " < "
+         << "((v_k_" << i << " - 1) * v_d_" << i << " + 1)) ? 0 : (idx_" << i
+         << " + v_p_" << i
+         << " - ((v_k_" << i << " - 1) * v_d_" << i << " + 1))"
+         << " / v_s_" << i << " + 1;" << std::endl;
+      ss << "d_end[" << i << "] = min(v_imso_" << i << " - 1, "
+         << "(idx_" << i << " + v_p_" << i << ")"
+         << " / v_s_" << i << ");" << std::endl;
+      ss << "d_iter[" << i << "] = d_start[" << i << "];" << std::endl;
+      ss << "if (d_start[" << i << "] > d_end[" << i << "]) {" << std::endl;
+      ss << "out_ptr[0] = 0;" << std::endl;
+      ss << "return;" << std::endl;
+      ss << "}" << std::endl;
+    }
+
+    if (pool_method_ == LIBDNN_POOLING_METHOD_AVE) {
+      ss << "int_tp av_start[" << num_axes_ << "];" << std::endl;
+      ss << "int_tp av_end[" << num_axes_ << "];" << std::endl;
+    }
+    // ss << "printf(\"%f\\n\", (float)ave);" << std::endl;
+    ss << "Dtype gradient = 0.0;" << std::endl;
+    ss << "bool incremented;" << std::endl;
+    ss << "do {" << std::endl;
+    ss << "int_tp offset = 0;" << std::endl;
+    for (int_tp i = 0; i < num_axes_; ++i) {
+      ss << "offset += d_iter[" << i << "];" << std::endl;
+      if (i < num_axes_ - 1) {
+        ss << "offset *= v_imso_" << (i + 1) << ";" << std::endl;
+      }
+    }
+    if (pool_method_ == LIBDNN_POOLING_METHOD_AVE) {
+      ss << "int_tp ave = 1;" << std::endl;
+      for (int_tp i = 0; i < num_axes_; ++i) {
+        ss << "av_start[" << i << "] = d_iter[" << i << "] * v_s_" << i
+        << " - v_p_" << i << ";" << std::endl;
+        ss << "av_end[" << i << "] = min(av_start[" << i << "] + ((v_k_"
+           << i << " - 1) * v_d_"
+           << i << " + 1), v_imsi_" << i << " + v_p_" << i << ");"
+           << std::endl;
+        ss << "ave *= ((av_end[" << i << "] - av_start[" << i << "] - 1) / v_d_"
+           << i << " + 1);"
+           << std::endl;
+      }
+    }
+    // Dilation filters
+    bool has_dilation = false;
+    for (int_tp i = 0; i < num_axes_; ++i) {
+      if (dilation_[i] > 1) {
+        has_dilation = true;
+      }
+    }
+    if (has_dilation &&
+        (pool_method_ == LIBDNN_POOLING_METHOD_AVE ||
+        pool_method_ == LIBDNN_POOLING_METHOD_STO)) {
+      ss << "if (";
+      for (int i  = 0; i < num_axes_; ++i) {
+        ss << "idx_" << i << " >= av_start[" << i << "] && ";
+        ss << "idx_" << i << " < av_end[" << i << "] && ";
+        ss << "(idx_" << i <<" - av_start[" << i << "]) % v_d_" << i << " == 0"
+           << " && ";
+      }
+      ss << "true) {" << std::endl;
+    }
+    if (pool_method_ == LIBDNN_POOLING_METHOD_MAX) {
+      ss << "if ((int_tp)mask_ptr[offset] == out_idx) {" << std::endl;
+    } else if (pool_method_ == LIBDNN_POOLING_METHOD_STO) {
+      ss << "if ((int_tp)rand_ptr[offset] == out_idx) {" << std::endl;
+    } else {
+      ss << "{" << std::endl;
+    }
+    ss << "gradient += in_ptr[offset]";
+    if (pool_method_ == LIBDNN_POOLING_METHOD_AVE) {
+      ss << " / (Dtype)ave;" << std::endl;
+    } else {
+      ss << ";" << std::endl;
+    }
+    ss << "}" << std::endl;
+    if (has_dilation &&
+        (pool_method_ == LIBDNN_POOLING_METHOD_AVE ||
+        pool_method_ == LIBDNN_POOLING_METHOD_STO)) {
+      ss << "}" << std::endl;
+    }
+    // Increment
+    ss << "incremented = false;" << std::endl;
+    ss << "for (int_tp i = v_nax - 1; i >= 0; --i) {" << std::endl;
+    ss << "if (d_iter[i] >= d_end[i]) {" << std::endl;
+    ss << "d_iter[i] = d_start[i];" << std::endl;
+    ss << "} else {" << std::endl;
+    ss << "++d_iter[i];" << std::endl;
+    ss << "incremented = true;" << std::endl;
+    ss << "break;" << std::endl;
+    ss << "}}} while (incremented);" << std::endl;
+
+    ss << "out_ptr[0] = gradient;" << std::endl;
+  }  // Deterministic kernel
   ss << "}" << std::endl;  // Kernel
 
   return ss.str();
@@ -634,9 +799,9 @@ void LibDNNPool<Dtype>::Forward(const Dtype* bottom_data,
                                 Dtype* top_mask,
                                 Dtype* rand_idx) {
   int_tp imsi = std::accumulate(im_in_shape_.begin(), im_in_shape_.end(),
-                                1, std::multiplies<int>());
+                                1, std::multiplies<int_tp>());
   int_tp imso = std::accumulate(im_out_shape_.begin(), im_out_shape_.end(),
-                                1, std::multiplies<int>());
+                                1, std::multiplies<int_tp>());
 
   int_tp lw0 = fw_tuner_->get_param<int_tp>("LW0");
   int_tp lw1 = fw_tuner_->get_param<int_tp>("LW1");
@@ -764,10 +929,25 @@ void LibDNNPool<Dtype>::Backward(const Dtype* top_diff,
                                 const int_tp* mask,
                                 const Dtype* top_mask,
                                 const Dtype* rand_idx) {
+  int_tp ims = batch_size * channels;
+  for (int_tp i = 0; i < im_in_shape_.size(); ++i) {
+    ims *= im_in_shape_[i];
+  }
+  LibDNN<Dtype>::SetMemory(bottom_diff, ims, 0, (Dtype) 0);
+
   int_tp imsi = std::accumulate(im_in_shape_.begin(), im_in_shape_.end(),
-                                1, std::multiplies<int>());
+                                1, std::multiplies<int_tp>());
   int_tp imso = std::accumulate(im_out_shape_.begin(), im_out_shape_.end(),
-                                1, std::multiplies<int>());
+                                1, std::multiplies<int_tp>());
+
+  int_tp imsw = 0;
+  if (bwalgo_ == LIBDNN_POOLING_BW_ALGO_DIRECT) {
+    // Direct kernel iterates over input size
+    imsw = imsi;
+  } else {
+    // Atomic kernel iterates over output size
+    imsw = imso;
+  }
 
   int_tp lw0 = bw_tuner_->get_param<int_tp>("LW0");
   int_tp lw1 = bw_tuner_->get_param<int_tp>("LW1");
@@ -783,7 +963,7 @@ void LibDNNPool<Dtype>::Backward(const Dtype* top_diff,
     kernel.local_work_size(1, lw1);
     kernel.local_work_size(2, 1);
 
-    kernel.global_work_size(0, ((imso - 1) / lw0 + 1) * lw0);
+    kernel.global_work_size(0, ((imsw - 1) / lw0 + 1) * lw0);
     kernel.global_work_size(1, ((channels * batch_size - 1) / lw1 + 1) * lw1);
     kernel.global_work_size(2, 1);
 
@@ -839,7 +1019,7 @@ void LibDNNPool<Dtype>::Backward(const Dtype* top_diff,
           void *args[] = { &top_diff, &bottom_diff, &top_mask,
               &channels, &batch_size };
           cuLaunchKernel(kernel,
-                         (imso - 1) / lw0 + 1,                   // Grid X
+                         (imsw - 1) / lw0 + 1,                   // Grid X
                          (channels * batch_size - 1) / lw1 + 1,  // Grid Y
                          1,                                      // Grid Z
                          lw0, lw1, 1,                            // Local
@@ -848,7 +1028,7 @@ void LibDNNPool<Dtype>::Backward(const Dtype* top_diff,
           void *args[] = { &top_diff, &bottom_diff, &mask,
               &channels, &batch_size };
           cuLaunchKernel(kernel,
-                         (imso - 1) / lw0 + 1,                   // Grid X
+                         (imsw - 1) / lw0 + 1,                   // Grid X
                          (channels * batch_size - 1) / lw1 + 1,  // Grid Y
                          1,                                      // Grid Z
                          lw0, lw1, 1,                            // Local
@@ -860,7 +1040,7 @@ void LibDNNPool<Dtype>::Backward(const Dtype* top_diff,
         void *args[] = { &top_diff, &bottom_diff,
             &channels, &batch_size };
         cuLaunchKernel(kernel,
-                       (imso - 1) / lw0 + 1,                   // Grid X
+                       (imsw - 1) / lw0 + 1,                   // Grid X
                        (channels * batch_size - 1) / lw1 + 1,  // Grid Y
                        1,                                      // Grid Z
                        lw0, lw1, 1,                            // Local
@@ -871,7 +1051,7 @@ void LibDNNPool<Dtype>::Backward(const Dtype* top_diff,
         void *args[] = { &top_diff, &bottom_diff, &rand_idx,
             &channels, &batch_size };
         cuLaunchKernel(kernel,
-                       (imso - 1) / lw0 + 1,                   // Grid X
+                       (imsw - 1) / lw0 + 1,                   // Grid X
                        (channels * batch_size - 1) / lw1 + 1,  // Grid Y
                        1,                                      // Grid Z
                        lw0, lw1, 1,                            // Local

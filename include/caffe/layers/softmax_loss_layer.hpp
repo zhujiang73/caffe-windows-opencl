@@ -53,11 +53,6 @@ class SoftmaxWithLossLayer : public LossLayer<Dtype> {
     */
   explicit SoftmaxWithLossLayer(const LayerParameter& param)
       : LossLayer<Dtype>(param) {}
-
-  virtual ~SoftmaxWithLossLayer() {
-     //LOG(INFO) << "caffe ~SoftmaxWithLossLayer debug ...";  
-  }
-
   virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top);
   virtual void Reshape(const vector<Blob<Dtype>*>& bottom,

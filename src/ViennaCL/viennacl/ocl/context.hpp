@@ -115,6 +115,12 @@ public:
     return devices_[current_device_id_];
   }
 
+  /** @brief Returns the current device index */
+  vcl_size_t current_device_id() const
+  {
+    return current_device_id_;
+  }
+
   /** @brief Switches the current device to the i-th device in this context */
   void switch_device(vcl_size_t i)
   {
@@ -198,7 +204,7 @@ public:
 #if defined(VIENNACL_DEBUG_ALL) || defined(VIENNACL_DEBUG_CONTEXT)
     std::cout << "ViennaCL: Creating memory of size " << size << " for context " << h_ << " (unsafe, returning cl_mem directly)" << std::endl;
 #endif
-    if (ptr)
+    if (ptr && !(flags & CL_MEM_USE_HOST_PTR))
       flags |= CL_MEM_COPY_HOST_PTR;
     cl_int err;
     cl_mem mem = clCreateBuffer(h_.get(), flags, size, ptr, &err);

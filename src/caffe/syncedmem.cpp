@@ -15,9 +15,9 @@
              ((size) % OPENCL_CACHE_ALIGN) == 0)
 #endif
 
-#ifdef  _MINGW
-#define posix_memalign(p, a, s) (((*(p)) = _aligned_malloc((s), (a))), *(p) ? 0 : errno)
-#endif  // _MINGW
+//#ifdef  _WIN32
+//#define posix_memalign(p, a, s) (((*(p)) = _aligned_malloc((s), (a))), *(p) ? 0 : errno)
+//#endif  
 
 namespace caffe {
 
@@ -37,10 +37,16 @@ void CaffeMallocHost(void** ptr, int_tp size, device* device_context) {
 #endif  // USE_CUDA
     } else {
       // Make sure the memory is zero-copy usable in OpenCL
+#ifdef _WIN32
+      // No aligned allocation support in windows for now.
+      // Using _aligned_malloc will crash due to a bug.
+      *ptr = malloc(((size - 1)/OPENCL_CACHE_ALIGN + 1) * OPENCL_CACHE_ALIGN);
+#else
       CHECK_EQ(0, posix_memalign(ptr, OPENCL_PAGE_ALIGN,
               ((size - 1)/OPENCL_CACHE_ALIGN + 1) * OPENCL_CACHE_ALIGN))
                   << "Host memory allocation error of size: "
                   << size << " B";
+#endif  // _WIN32
       return;
     }
   }
@@ -61,11 +67,11 @@ void CaffeFreeHost(void* ptr, device* device_context) {
   }
 #endif
 
-#ifdef  _MINGW
-  _aligned_free(ptr);
-#else
+//#ifdef  _WIN32
+//  _aligned_free(ptr);
+//#else
   free(ptr);
-#endif  // _MINGW
+//#endif  
 }
 
 
@@ -89,44 +95,35 @@ SyncedMemory::~SyncedMemory() {
     } else {
 #ifdef USE_GREENTEA
       // Free device memory
-      //LOG(INFO)<< "OpenCL  quit device debug01:  ...   " << device_->id();  
-      //viennacl::ocl::context &ctx = viennacl::ocl::get_context(device_->id());
-      //ctx.get_queue().finish();
-      //CHECK_EQ(CL_SUCCESS, clReleaseMemObject(cl_gpu_mem_))
-      //    << "OpenCL memory corruption";
+      viennacl::ocl::context &ctx = viennacl::ocl::get_context(
+          device_->id());
+      ctx.get_queue().finish();
+      CHECK_EQ(CL_SUCCESS, clReleaseMemObject(cl_gpu_mem_))
+          << "OpenCL memory corruption";
       gpu_ptr_ = nullptr;
       cl_gpu_mem_ = nullptr;
-      //ctx.get_queue().finish();
-      //LOG(INFO)<< "OpenCL  quit device debug02 :  ...   " << device_->id();
+      ctx.get_queue().finish();
       if (own_zero_copy_data_ && own_cpu_data_ && cpu_ptr_) {
         CaffeFreeHost(cpu_ptr_, device_);
         cpu_ptr_ = nullptr;
       }
-      //LOG(INFO)<< "OpenCL  quit device debug03:  ...   " << device_->id();
       device_->DecreaseMemoryUsage(size_);
-      //LOG(INFO)<< "OpenCL  quit device debug04:  ...   " << device_->id();
 #endif  // USE_GREENTEA
     }
   }
 #endif  // !CPU_ONLY
   // Free host memory
-
-     //LOG(INFO)<< "OpenCL  CaffeFreeHost 01:  ...   " << device_->id();
   if (cpu_ptr_ && own_cpu_data_) {
     CaffeFreeHost(cpu_ptr_, device_);
     cpu_ptr_ = nullptr;
   }
-     //LOG(INFO)<< "OpenCL  CaffeFreeHost 02:  ...   " << device_->id();
 }
 
 inline void SyncedMemory::to_cpu() {
   switch (head_) {
     case UNINITIALIZED: {
-      //  LOG(INFO) << "SyncedMemory::to_cpu UNINITIALIZED debug01 ...";
       CaffeMallocHost(&cpu_ptr_, size_, device_);
-      // LOG(INFO) << "SyncedMemory::to_cpu UNINITIALIZED debug02 ...";
-       caffe_memset(size_, 0, cpu_ptr_); // debug zj
-      // LOG(INFO) << "SyncedMemory::to_cpu UNINITIALIZED debug03 ...";
+      caffe_memset(size_, 0, cpu_ptr_);
       head_ = HEAD_AT_CPU;
       own_cpu_data_ = true;
       break;
@@ -134,7 +131,6 @@ inline void SyncedMemory::to_cpu() {
     case HEAD_AT_GPU: {
 #ifndef CPU_ONLY
       if (cpu_ptr_ == nullptr) {
-        //  LOG(INFO) << "SyncedMemory::to_cpu  debug01 ...";  
         CaffeMallocHost(&cpu_ptr_, size_, device_);
         own_cpu_data_ = true;
 #ifdef USE_GREENTEA
@@ -142,22 +138,18 @@ inline void SyncedMemory::to_cpu() {
            << "Allocate host memory for a zero copy buffer.";
 #endif
       }
-      //LOG(INFO) << "SyncedMemory::to_cpu  debug02 ...";  
+
       if (device_->backend() == Backend::BACKEND_CUDA) {
 #ifdef USE_CUDA
         caffe_gpu_memcpy(size_, gpu_ptr_, cpu_ptr_);
 #endif  // USE_CUDA
       } else {
 #ifdef USE_GREENTEA
-        //  LOG(INFO) << "SyncedMemory::to_cpu  debug03 ...";  
         viennacl::ocl::context &ctx = viennacl::ocl::get_context(
             device_->id());
-        //LOG(INFO) << "SyncedMemory::to_cpu  debug04 ...";  
         if (!own_zero_copy_data_) {
-          //  LOG(INFO) << "SyncedMemory::to_cpu  debug05 ...";  
           greentea_gpu_memcpy(size_, (cl_mem) gpu_ptr_, 0, cpu_ptr_, &ctx);
         } else {
-            //LOG(INFO) << "SyncedMemory::to_cpu  debug06 ...";  
           void *mapped_ptr = clEnqueueMapBuffer(ctx.get_queue().handle().get(),
                                 (cl_mem) gpu_ptr_,
                                 true,
@@ -166,14 +158,11 @@ inline void SyncedMemory::to_cpu() {
           CHECK_EQ(mapped_ptr, cpu_ptr_)
             << "Device claims it support zero copy"
             << " but failed to create correct user ptr buffer";
-          LOG(INFO) << "SyncedMemory::to_cpu  debug07 ...";  
           clEnqueueUnmapMemObject(ctx.get_queue().handle().get(),
                                   (cl_mem) gpu_ptr_,
                                   mapped_ptr, 0, NULL, NULL);
         }
-        //LOG(INFO) << "SyncedMemory::to_cpu  debug08 ...";  
         ctx.get_queue().finish();
-        //LOG(INFO) << "SyncedMemory::to_cpu  debug09 ...";  
 #endif
       }
       head_ = SYNCED;

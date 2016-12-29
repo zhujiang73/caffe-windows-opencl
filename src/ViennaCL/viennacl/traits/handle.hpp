@@ -122,10 +122,34 @@ viennacl::backend::mem_handle const & handle(viennacl::vector_expression<LHS, RH
   return handle(obj.lhs());
 }
 
+template<typename RHS, typename OP>
+viennacl::backend::mem_handle const & handle(viennacl::vector_expression<const float, RHS, OP> const & obj)
+{
+  return handle(obj.rhs());
+}
+
+template<typename RHS, typename OP>
+viennacl::backend::mem_handle const & handle(viennacl::vector_expression<const double, RHS, OP> const & obj)
+{
+  return handle(obj.rhs());
+}
+
 template<typename LHS, typename RHS, typename OP>
 viennacl::backend::mem_handle const & handle(viennacl::matrix_expression<LHS, RHS, OP> const & obj)
 {
   return handle(obj.lhs());
+}
+
+template<typename RHS, typename OP>
+viennacl::backend::mem_handle const & handle(viennacl::matrix_expression<const float, RHS, OP> const & obj)
+{
+  return handle(obj.rhs());
+}
+
+template<typename RHS, typename OP>
+viennacl::backend::mem_handle const & handle(viennacl::matrix_expression<const double, RHS, OP> const & obj)
+{
+  return handle(obj.rhs());
 }
 
 /** \endcond */
@@ -248,11 +272,36 @@ viennacl::memory_types active_handle_id(viennacl::vector_expression<LHS, RHS, OP
   return active_handle_id(obj.lhs());
 }
 
+template<typename RHS, typename OP>
+viennacl::memory_types active_handle_id(viennacl::vector_expression<const float, RHS, OP> const & obj)
+{
+  return active_handle_id(obj.rhs());
+}
+
+template<typename RHS, typename OP>
+viennacl::memory_types active_handle_id(viennacl::vector_expression<const double, RHS, OP> const & obj)
+{
+  return active_handle_id(obj.rhs());
+}
+
 template<typename LHS, typename RHS, typename OP>
 viennacl::memory_types active_handle_id(viennacl::matrix_expression<LHS, RHS, OP> const & obj)
 {
   return active_handle_id(obj.lhs());
 }
+
+template<typename RHS, typename OP>
+viennacl::memory_types active_handle_id(viennacl::matrix_expression<const float, RHS, OP> const & obj)
+{
+  return active_handle_id(obj.rhs());
+}
+
+template<typename RHS, typename OP>
+viennacl::memory_types active_handle_id(viennacl::matrix_expression<const double, RHS, OP> const & obj)
+{
+  return active_handle_id(obj.rhs());
+}
+
 
 // for user-provided matrix-vector routines:
 template<typename LHS, typename NumericT>

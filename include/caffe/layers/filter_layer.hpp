@@ -20,11 +20,6 @@ class FilterLayer : public Layer<Dtype> {
  public:
   explicit FilterLayer(const LayerParameter& param)
       : Layer<Dtype>(param) {}
-
-  virtual ~FilterLayer() {
-     //LOG(INFO) << "caffe ~FilterLayer debug ...";  
-  }
-
   virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top);
   virtual void Reshape(const vector<Blob<Dtype>*>& bottom,

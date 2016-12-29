@@ -77,7 +77,7 @@ int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
   caffe::GlobalInit(&argc, &argv);
 #ifndef CPU_ONLY
-  int device = 0;
+  int device = 1;
   if (argc > 1) {
     // Use the given device
     device = atoi(argv[1]);

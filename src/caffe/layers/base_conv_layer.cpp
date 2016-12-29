@@ -366,8 +366,6 @@ void BaseConvolutionLayer<Dtype>::forward_gpu_gemm(const Dtype* input,
                                                    Dtype* output,
                                                    const int_tp output_off,
                                                    bool skip_im2col) {
-  //LOG(INFO) << "forward_gpu_gemm " ; 
-
   const Dtype* col_buff = input;
   if (this->device_->backend() == BACKEND_CUDA) {
 #ifdef USE_CUDA
@@ -390,15 +388,12 @@ void BaseConvolutionLayer<Dtype>::forward_gpu_gemm(const Dtype* input,
 #ifdef USE_GREENTEA
     if (!is_1x1_) {
       if (!skip_im2col) {
-         //col_buffer()->mutable_gpu_data();
-         //shared_ptr<Blob<Dtype> >  ptr_col_buf = col_buffer();
-         //ptr_col_buf->mutable_gpu_data();
-        greentea_conv_im2col_gpu(input, input_off, col_buffer()->mutable_gpu_data(), 0);
+        greentea_conv_im2col_gpu(input, input_off,
+                                 col_buffer()->mutable_gpu_data(), 0);
       }
       col_buff = col_buffer()->gpu_data();
     }
     for (int_tp g = 0; g < group_; ++g) {
-
       greentea_gpu_gemm<Dtype>(this->device_->id(), CblasNoTrans,
                                CblasNoTrans, conv_out_channels_ / group_,
                                conv_out_spatial_dim_, kernel_dim_,
@@ -407,7 +402,6 @@ void BaseConvolutionLayer<Dtype>::forward_gpu_gemm(const Dtype* input,
                                (is_1x1_ ? input_off : 0) + col_offset_ * g,
                                (Dtype) 0., (cl_mem) output,
                                output_off + output_offset_ * g);
-
     }
 #endif  // USE_GREENTEA
   }

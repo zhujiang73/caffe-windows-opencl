@@ -20,11 +20,6 @@ class PoolingLayer : public Layer<Dtype> {
   explicit PoolingLayer(const LayerParameter& param)
       : Layer<Dtype>(param) {
   }
-
-  virtual ~PoolingLayer() {
-     //LOG(INFO) << "caffe ~PoolingLayer debug ...";  
-  }
-
   virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
                           const vector<Blob<Dtype>*>& top);
   virtual void Reshape(const vector<Blob<Dtype>*>& bottom,

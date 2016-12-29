@@ -20,11 +20,6 @@ class InputLayer : public Layer<Dtype> {
  public:
   explicit InputLayer(const LayerParameter& param)
       : Layer<Dtype>(param) {}
-
-  virtual ~InputLayer() {
-     //LOG(INFO) << "caffe ~InputLayer debug ...";  
-  }
-
   virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top);
   // Data layers should be shared by multiple solvers in parallel

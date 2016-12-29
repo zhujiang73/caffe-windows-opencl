@@ -18,10 +18,8 @@ DataLayer<Dtype>::DataLayer(const LayerParameter& param)
 }
 
 template<typename Dtype>
-DataLayer<Dtype>::~DataLayer() {    
-  LOG(INFO) << "caffe ~DataLayer debug01 ...";  
+DataLayer<Dtype>::~DataLayer() {
   this->StopInternalThread();
-  LOG(INFO) << "caffe ~DataLayer debug02 ..."; 
 }
 
 template<typename Dtype>

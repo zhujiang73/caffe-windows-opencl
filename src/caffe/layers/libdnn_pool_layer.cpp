@@ -21,7 +21,15 @@ void LibDNNPoolingLayer<Dtype>::Reshape(
 
   PoolingLayer<Dtype>::Reshape(bottom, top);
 
-  if (libdnn_.get() == nullptr) {
+  bool shapes_changed = false;
+  if (libdnn_.get() != nullptr) {
+    shapes_changed = shapes_changed || (libdnn_.get()->get_config().in_shape
+        != bottom[0]->shape());
+    shapes_changed = shapes_changed || (libdnn_.get()->get_config().out_shape
+        != top[0]->shape());
+  }
+
+  if (libdnn_.get() == nullptr || shapes_changed) {
     int_tp* kernel_shape_data = this->kernel_shape_.mutable_cpu_data();
     int_tp* pad_data = this->pad_.mutable_cpu_data();
     int_tp* stride_data = this->stride_.mutable_cpu_data();
@@ -67,6 +75,22 @@ void LibDNNPoolingLayer<Dtype>::Reshape(
 
     config.global_pooling = this->global_pooling_;
 
+
+    if ((std::is_same<Dtype, float>::value
+        && (this->device_->CheckCapability(
+                "cl_khr_int32_base_atomics") ||
+            this->device_->CheckCapability(
+                "cl_khr_global_int32_base_atomics") ||
+            this->device_->CheckCapability(
+                "cl_khr_global_int32_extended_atomics"))) ||
+        (std::is_same<Dtype, double>::value
+        && (this->device_->CheckCapability("cl_khr_int64_base_atomics") ||
+            this->device_->CheckCapability("cl_khr_int64_extended_atomics")))) {
+      config.bwalgo = LIBDNN_POOLING_BW_ALGO_ATOMIC;
+    } else {
+      config.bwalgo = LIBDNN_POOLING_BW_ALGO_DIRECT;
+    }
+
     LibDNNPool<Dtype>* libdnn = new LibDNNPool<Dtype>(config);
 
     libdnn_.reset(libdnn);
@@ -103,19 +127,21 @@ void LibDNNPoolingLayer<Dtype>::Forward_gpu(
       }
       break;
     case PoolingParameter_PoolMethod_STOCHASTIC:
-      if (this->device_->backend() == BACKEND_CUDA) {
+      if (!test_mode) {
+        if (this->device_->backend() == BACKEND_CUDA) {
 #ifdef USE_CUDA
-        caffe_gpu_rng_uniform(count, Dtype(0), Dtype(1),
-          this->rand_idx_.mutable_gpu_data());
+          caffe_gpu_rng_uniform(count, Dtype(0), Dtype(1),
+            this->rand_idx_.mutable_gpu_data());
 #endif  // USE_CUDA
-      } else {
+        } else {
 #ifdef USE_GREENTEA
-        greentea_gpu_rng_uniform(this->device_->id(), count,
-          Dtype(0), Dtype(1),
-          (cl_mem)(this->rand_idx_.mutable_gpu_data()), 0);
+          greentea_gpu_rng_uniform(this->device_->id(), count,
+            Dtype(0), Dtype(1),
+            (cl_mem)(this->rand_idx_.mutable_gpu_data()), 0);
 #endif  // USE_GREENTEA
+        }
+        rand_idx = this->rand_idx_.mutable_gpu_data();
       }
-      rand_idx = this->rand_idx_.mutable_gpu_data();
       break;
   }
 

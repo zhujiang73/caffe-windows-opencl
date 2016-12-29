@@ -57,7 +57,6 @@ class Layer {
   }
 
   virtual ~Layer() {
-     //LOG(INFO) << "caffe ~Layer debug ...";  
   }
 
   /**

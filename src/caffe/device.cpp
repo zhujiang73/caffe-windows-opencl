@@ -43,8 +43,6 @@ void device::Init() {
 #ifdef USE_GREENTEA
     viennacl::ocl::context &ctx = viennacl::ocl::get_context(id_);
 
-    //viennacl::ocl::context &ctx = viennacl::ocl::current_context();
-
     std::vector<size_t> temp(3);
     clGetDeviceInfo(ctx.devices()[0].id(),
                     CL_DEVICE_MAX_WORK_ITEM_SIZES,
@@ -58,16 +56,11 @@ void device::Init() {
                     sizeof(cl_bool), &host_unified, NULL);
 
     host_unified_ = host_unified;
-
-    LOG(INFO) << "OpenCL GREENTEA_QUEUE_COUNT : " << GREENTEA_QUEUE_COUNT; 
-
-    LOG(INFO) << "OpenCL SetProgram debug01 ...";  
     SetProgram();
-    LOG(INFO) << "OpenCL SetProgram debug02 ...";  
 
-    //for (int q = 0; q < GREENTEA_QUEUE_COUNT - 1; ++q) {
+    for (int q = 0; q < GREENTEA_QUEUE_COUNT - 1; ++q) {
       ctx.add_queue(ctx.devices()[0]);
-    //}
+    }
 #endif  // USE_GREENTEA
   }
 #endif  // !CPU_ONLY

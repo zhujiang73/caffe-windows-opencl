@@ -32,7 +32,6 @@ class Net {
                const int level = 0, const vector<string>* stages = NULL,
                const Net* root_net = NULL);
   virtual ~Net() {
-      LOG(INFO) << "caffe ~Net debug ...";  
   }
 
   /// @brief Initialize a network with a NetParameter.

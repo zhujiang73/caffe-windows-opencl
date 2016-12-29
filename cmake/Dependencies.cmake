@@ -6,7 +6,8 @@ set(Caffe_COMPILE_OPTIONS "")
 
 # ---[ Boost
 find_package(Boost 1.46 REQUIRED COMPONENTS system thread filesystem)
-list(APPEND Caffe_INCLUDE_DIRS PUBLIC ${Boost_INCLUDE_DIRS})
+include_directories(SYSTEM PUBLIC ${Boost_INCLUDE_DIR})
+add_definitions(-DBOOST_ALL_NO_LIB)
 list(APPEND Caffe_LINKER_LIBS PUBLIC ${Boost_LIBRARIES})
 
 # ---[ Threads
@@ -27,10 +28,47 @@ list(APPEND Caffe_LINKER_LIBS PUBLIC ${GFLAGS_LIBRARIES})
 include(cmake/ProtoBuf.cmake)
 
 # ---[ HDF5
-find_package(HDF5 COMPONENTS HL REQUIRED)
-list(APPEND Caffe_INCLUDE_DIRS PUBLIC ${HDF5_INCLUDE_DIRS})
+if(MSVC)
+  # Find HDF5 using it's hdf5-config.cmake file with MSVC
+  if(DEFINED HDF5_DIR)
+    list(APPEND CMAKE_MODULE_PATH ${HDF5_DIR})
+  endif()
+  find_package(HDF5 COMPONENTS C HL REQUIRED)
+  set(HDF5_LIBRARIES hdf5-shared)
+  set(HDF5_HL_LIBRARIES hdf5_hl-shared)
+else()
+  find_package(HDF5 COMPONENTS HL REQUIRED)
+endif()
+include_directories(SYSTEM ${HDF5_INCLUDE_DIRS} ${HDF5_HL_INCLUDE_DIR})
 list(APPEND Caffe_LINKER_LIBS PUBLIC ${HDF5_LIBRARIES} ${HDF5_HL_LIBRARIES})
+list(APPEND Caffe_INCLUDE_DIRS PUBLIC ${HDF5_INCLUDE_DIRS})
 
+# ---[ LMDB
+if(USE_LMDB)
+  #find_package(LMDB REQUIRED)
+  list(APPEND Caffe_INCLUDE_DIRS PUBLIC ${LMDB_INCLUDE_DIR})
+  list(APPEND Caffe_LINKER_LIBS PUBLIC ${LMDB_LIBRARIES})
+  list(APPEND Caffe_DEFINITIONS PUBLIC -DUSE_LMDB)
+
+  if(ALLOW_LMDB_NOLOCK)
+    list(APPEND Caffe_DEFINITIONS PRIVATE -DALLOW_LMDB_NOLOCK)
+  endif()
+endif()
+
+# ---[ LevelDB
+if(USE_LEVELDB)
+  find_package(LevelDB REQUIRED)
+  list(APPEND Caffe_INCLUDE_DIRS PUBLIC ${LevelDB_INCLUDES})
+  list(APPEND Caffe_LINKER_LIBS PUBLIC ${LevelDB_LIBRARIES})
+  list(APPEND Caffe_DEFINITIONS PUBLIC -DUSE_LEVELDB)
+endif()
+
+# ---[ Snappy
+if(USE_LEVELDB)
+  find_package(Snappy REQUIRED)
+  list(APPEND Caffe_INCLUDE_DIRS PRIVATE ${Snappy_INCLUDE_DIR})
+  list(APPEND Caffe_LINKER_LIBS PRIVATE ${Snappy_LIBRARIES})
+endif()
 
 # ---[ CUDA
 include(cmake/Cuda.cmake)
@@ -41,15 +79,23 @@ elseif(NOT HAVE_CUDA)
   message(WARNING "-- CUDA is not detected by cmake. Building without it...")
 endif()
 
+# find OpenCL
+find_package(OpenCL REQUIRED)
+list(APPEND Caffe_INCLUDE_DIRS PUBLIC "${OPENCL_INCLUDE_DIRS}")
+list(APPEND Caffe_LINKER_LIBS PUBLIC "${OPENCL_LIBRARIES}")
+
 # ---[ ViennaCL
 if (USE_GREENTEA)
-  list(APPEND Caffe_DEFINITIONS PUBLIC -DUSE_GREENTEA)  
-  list(APPEND Caffe_DEFINITIONS PUBLIC -DVIENNACL_WITH_OPENCL)
+  #find_package(ViennaCL)
+  if (NOT ViennaCL_FOUND)
+    message(FATAL_ERROR "ViennaCL required for GREENTEA but not found.")
+  endif()
 
-  # find OpenCL
-  find_package(OpenCL REQUIRED)
-  list(APPEND Caffe_INCLUDE_DIRS PUBLIC ${OPENCL_INCLUDE_DIRS})
-  list(APPEND Caffe_LINKER_LIBS ${OPENCL_LIBRARIES})
+  list(APPEND Caffe_INCLUDE_DIRS PUBLIC "${ViennaCL_INCLUDE_DIRS}")
+  list(APPEND Caffe_LINKER_LIBS PUBLIC "${ViennaCL_LIBRARIES}")
+  list(APPEND Caffe_DEFINITIONS PUBLIC -DUSE_GREENTEA)
+  
+  list(APPEND Caffe_DEFINITIONS PUBLIC -DVIENNACL_WITH_OPENCL)
 
   if(USE_LIBDNN)
     list(APPEND Caffe_DEFINITIONS PRIVATE -DUSE_LIBDNN)
@@ -94,15 +140,15 @@ if (NOT USE_GREENTEA AND NOT USE_CUDA)
 endif()
 
 # ---[ clBLAS
-#if (USE_CLBLAS AND NOT USE_ISAAC)
-#  find_package(clBLAS)
-#  if (NOT CLBLAS_FOUND)
-#    message(FATAL_ERROR "clBLAS required but not found.")
-#  endif()
-#  list(APPEND Caffe_INCLUDE_DIRS PUBLIC ${CLBLAS_INCLUDE_DIR})
-#  list(APPEND Caffe_LINKER_LIBS PUBLIC ${CLBLAS_LIBRARY})
-#  list(APPEND Caffe_DEFINITIONS PUBLIC -DUSE_CLBLAS)
-#endif()
+if (USE_CLBLAS AND NOT USE_ISAAC)
+  find_package(clBLAS)
+  if (NOT CLBLAS_FOUND)
+    message(FATAL_ERROR "clBLAS required but not found.")
+  endif()
+  list(APPEND Caffe_INCLUDE_DIRS PUBLIC ${CLBLAS_INCLUDE_DIR})
+  list(APPEND Caffe_LINKER_LIBS PUBLIC ${CLBLAS_LIBRARY})
+  list(APPEND Caffe_DEFINITIONS PUBLIC -DUSE_CLBLAS)
+endif()
 
 # ---[ ISAAC
 if (USE_ISAAC)
@@ -115,12 +161,12 @@ if (USE_ISAAC)
 endif()
 
 # ---[ CLBlast
-#if (USE_CLBLAST)
-#  find_package(CLBlast REQUIRED)
-#  message(STATUS "CLBlast found")
-#  list(APPEND Caffe_LINKER_LIBS PUBLIC clblast)
-#  list(APPEND Caffe_DEFINITIONS PUBLIC -DUSE_CLBLAST)
-#endif()
+if (USE_CLBLAST)
+  find_package(CLBlast REQUIRED)
+  message(STATUS "CLBlast found")
+  list(APPEND Caffe_LINKER_LIBS PUBLIC clblast)
+  list(APPEND Caffe_DEFINITIONS PUBLIC -DUSE_CLBLAST)
+endif()
 
 # ---[ OpenCV
 if(USE_OPENCV)
@@ -140,18 +186,15 @@ endif()
 # to flick the switch manually as needed.
 if(USE_OPENMP)
   find_package(OpenMP REQUIRED)
-else()
-  find_package(OpenMP QUIET)
-endif()
-
 # Moreover, OpenMP package does not provide an IMPORTED target as well, and the
 # suggested way of linking to OpenMP is to append to CMAKE_{C,CXX}_FLAGS.
 # However, this naïve method will force any user of Caffe to add the same kludge
 # into their buildsystem again, so we put these options into per-target PUBLIC
 # compile options and link flags, so that they will be exported properly.
-if(OpenMP_CXX_FLAGS)
-  list(APPEND Caffe_LINKER_LIBS PRIVATE ${OpenMP_CXX_FLAGS})
-  list(APPEND Caffe_COMPILE_OPTIONS PRIVATE ${OpenMP_CXX_FLAGS})
+	if(OpenMP_CXX_FLAGS)
+	  list(APPEND Caffe_LINKER_LIBS PRIVATE ${OpenMP_CXX_FLAGS})
+	  list(APPEND Caffe_COMPILE_OPTIONS PRIVATE ${OpenMP_CXX_FLAGS})
+	endif()
 endif()
 
 # ---[ BLAS
@@ -194,18 +237,18 @@ if(BUILD_python)
     find_package(NumPy 1.7.1)
     # Find the matching boost python implementation
     set(version ${PYTHONLIBS_VERSION_STRING})
-    
+
     STRING( REGEX REPLACE "[^0-9]" "" boost_py_version ${version} )
     find_package(Boost 1.46 COMPONENTS "python-py${boost_py_version}")
     set(Boost_PYTHON_FOUND ${Boost_PYTHON-PY${boost_py_version}_FOUND})
-    
+
     while(NOT "${version}" STREQUAL "" AND NOT Boost_PYTHON_FOUND)
       STRING( REGEX REPLACE "([0-9.]+).[0-9]+" "\\1" version ${version} )
-      
+
       STRING( REGEX REPLACE "[^0-9]" "" boost_py_version ${version} )
       find_package(Boost 1.46 COMPONENTS "python-py${boost_py_version}")
       set(Boost_PYTHON_FOUND ${Boost_PYTHON-PY${boost_py_version}_FOUND})
-      
+
       STRING( REGEX MATCHALL "([0-9.]+).[0-9]+" has_more_version ${version} )
       if("${has_more_version}" STREQUAL "")
         break()
@@ -223,6 +266,9 @@ if(BUILD_python)
   endif()
   if(PYTHONLIBS_FOUND AND NUMPY_FOUND AND Boost_PYTHON_FOUND)
     set(HAVE_PYTHON TRUE)
+    if(Boost_USE_STATIC_LIBS AND MSVC)
+      add_definitions(-DBOOST_PYTHON_STATIC_LIB)
+    endif()
     if(BUILD_python_layer)
       list(APPEND Caffe_DEFINITIONS PRIVATE -DWITH_PYTHON_LAYER)
       list(APPEND Caffe_INCLUDE_DIRS PRIVATE ${PYTHON_INCLUDE_DIRS} ${NUMPY_INCLUDE_DIR} PUBLIC ${Boost_INCLUDE_DIRS})
@@ -251,3 +297,6 @@ endif()
 if(BUILD_docs)
   find_package(Doxygen)
 endif()
+
+include_directories(${Caffe_INCLUDE_DIRS})
+link_directories(${Caffe_LINKER_LIBS})

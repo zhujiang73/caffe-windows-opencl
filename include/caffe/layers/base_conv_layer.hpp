@@ -180,7 +180,6 @@ class BaseConvolutionLayer : public Layer<Dtype> {
   inline void greentea_conv_im2col_gpu(const Dtype* data, const int_tp data_off,
                                        Dtype* col_buff,
                                        const int_tp col_buff_off) {
-
     viennacl::ocl::context &ctx = viennacl::ocl::get_context(
         this->device_->id());
     viennacl::ocl::program &program = this->device_->program();

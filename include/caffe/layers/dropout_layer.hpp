@@ -33,12 +33,6 @@ class DropoutLayer : public NeuronLayer<Dtype> {
    */
   explicit DropoutLayer(const LayerParameter& param)
       : NeuronLayer<Dtype>(param) {}
-
-  virtual ~DropoutLayer() {
-     //LOG(INFO) << "caffe ~DropoutLayer debug ...";  
-  }
-  
-
   virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top);
   virtual void Reshape(const vector<Blob<Dtype>*>& bottom,

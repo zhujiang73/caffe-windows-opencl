@@ -19,11 +19,6 @@ class SoftmaxLayer : public Layer<Dtype> {
  public:
   explicit SoftmaxLayer(const LayerParameter& param)
       : Layer<Dtype>(param) {}
-
-  virtual ~SoftmaxLayer() {
-     //LOG(INFO) << "caffe ~SoftmaxLayer debug ...";  
-  }
-
   virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top);
 

@@ -12,6 +12,7 @@ namespace caffe {
 
 template<typename Dtype>
 LibDNNConv<Dtype>::LibDNNConv(LibDNNConvConfig config) {
+  config_ = config;
   LibDNN<Dtype>::dev_ptr_ = config.dev_ptr;
   bias_term_ = config.bias_term;
   bias_multiplier_ = config.bias_term ? 1.0 : 0.0;
@@ -210,6 +211,11 @@ LibDNNConv<Dtype>::LibDNNConv(LibDNNConvConfig config) {
 }
 
 template<typename Dtype>
+const LibDNNConvConfig LibDNNConv<Dtype>::get_config() {
+  return config_;
+}
+
+template<typename Dtype>
 std::string LibDNNConv<Dtype>::string_identifier() {
   std::stringstream ss;
   ss << "CONV_";
@@ -382,6 +388,10 @@ std::string LibDNNConv<Dtype>::generate_fw_defs() {
   // Loads-per-thread for B
   LibDNN<Dtype>::add_def(ss, "LPTB", "((TSK*TSN)/(RTSM*RTSN))");
 
+  // Num tiles needs to be next higher even integer
+  // (due to some quirky bug in AMD OpenCL 2.0 on Windows)
+  LibDNN<Dtype>::add_def(ss, "v_num_tiles", "(((K - 1)/(TSK*2) + 1)*2)");
+
   return ss.str();
 }
 
@@ -534,6 +544,10 @@ std::string LibDNNConv<Dtype>::generate_bw_defs() {
   // Loads-per-thread for B
   LibDNN<Dtype>::add_def(ss, "LPTB", "((TSK*TSN)/(RTSM*RTSN))");
 
+  // Num tiles needs to be next higher even integer
+  // (due to some quirky bug in AMD OpenCL 2.0 on Windows)
+  LibDNN<Dtype>::add_def(ss, "v_num_tiles", "(((K - 1)/(TSK*2) + 1)*2)");
+
   return ss.str();
 }
 
@@ -659,6 +673,10 @@ std::string LibDNNConv<Dtype>::generate_wg_defs() {
   LibDNN<Dtype>::add_def(ss, "LPTA", "((TSK*TSM)/(RTSM*RTSN))");
   // Loads-per-thread for B
   LibDNN<Dtype>::add_def(ss, "LPTB", "((TSK*TSN)/(RTSM*RTSN))");
+
+  // Num tiles needs to be next higher even integer
+  // (due to some quirky bug in AMD OpenCL 2.0 on Windows)
+  LibDNN<Dtype>::add_def(ss, "v_num_tiles", "(((K - 1)/(TSK*2) + 1)*2)");
 
   return ss.str();
 }
@@ -829,10 +847,10 @@ std::string LibDNNConv<Dtype>::generate_fw_kernels(std::string name) {
 
   // Forward kernel
   ss << "__kernel" << std::endl;
-  /*ss << "__attribute__((work_group_size_hint("
+  ss << "__attribute__((reqd_work_group_size("
      << rtsn << ", " << rtsm << ", 1)))" << std::endl;
   ss << "__attribute__((vec_type_hint(Dtype"
-     << std::min(vwm, vwn) << ")))" << std::endl;*/
+     << std::min(vwm, vwn) << ")))" << std::endl;
   ss << "void " + name + "(";
   ss << "__global const Dtype* __restrict im_in, ";
   ss << "__global const Dtype* __restrict wg, ";
@@ -893,9 +911,8 @@ std::string LibDNNConv<Dtype>::generate_fw_kernels(std::string name) {
 
   ss << "{" << std::endl;  // Scoping for load & compute block
   // Loop over all tiles
-  ss << "int_tp numTiles = ((K - 1)/TSK) + 1;" << std::endl;
   ss << "#pragma unroll 1" << std::endl;
-  ss << "for (int_tp t = 0; t < numTiles; ++t) {" << std::endl;
+  ss << "for (int_tp t = 0; t < v_num_tiles; ++t) {" << std::endl;
 
   // Load one tile of A into local memory
   ss << "{" << std::endl;  // Scoping for loading A
@@ -1098,7 +1115,12 @@ std::string LibDNNConv<Dtype>::generate_wg_kernels(std::string name) {
   int lptb = (tsn * tsk) / (rtsm * rtsn);
 
   // Weight kernel
-  ss << "__kernel void " + name + "(";
+  ss << "__kernel" << std::endl;
+  ss << "__attribute__((reqd_work_group_size("
+     << rtsn << ", " << rtsm << ", 1)))" << std::endl;
+  ss << "__attribute__((vec_type_hint(Dtype"
+     << std::min(vwm, vwn) << ")))" << std::endl;
+  ss << "void " + name + "(";
   ss << "__global const Dtype* __restrict im_in, ";
   ss << "__global const Dtype* __restrict im_out, ";
   if (bias_term_) {
@@ -1163,9 +1185,8 @@ std::string LibDNNConv<Dtype>::generate_wg_kernels(std::string name) {
   }
 
   // Loop over all tiles
-  ss << "int_tp numTiles = ((K - 1)/TSK) + 1;" << std::endl;
   ss << "#pragma unroll 1" << std::endl;
-  ss << "for (int_tp t = 0; t < numTiles; ++t) {" << std::endl;
+  ss << "for (int_tp t = 0; t < v_num_tiles; ++t) {" << std::endl;
 
   // Load one tile of A into local memory
   ss << "{" << std::endl;  // Scoping for loading A
@@ -1331,7 +1352,12 @@ std::string LibDNNConv<Dtype>::generate_bw_kernels(std::string name) {
   int lptb = (tsn * tsk) / (rtsm * rtsn);
 
   // Backward kernel
-  ss << "__kernel void " + name + "(";
+  ss << "__kernel" << std::endl;
+  ss << "__attribute__((reqd_work_group_size("
+     << rtsn << ", " << rtsm << ", 1)))" << std::endl;
+  ss << "__attribute__((vec_type_hint(Dtype"
+     << std::min(vwm, vwn) << ")))" << std::endl;
+  ss << "void " + name + "(";
   ss << "__global const Dtype* __restrict im_out, ";
   ss << "__global const Dtype* __restrict wg, ";
   if (bias_term_) {
@@ -1385,9 +1411,8 @@ std::string LibDNNConv<Dtype>::generate_bw_kernels(std::string name) {
 
   ss << "{" << std::endl;  // Scoping for load & compute block
   // Loop over all tiles
-  ss << "int_tp numTiles = ((K - 1)/TSK) + 1;" << std::endl;
   ss << "#pragma unroll 1" << std::endl;
-  ss << "for (int_tp t = 0; t < numTiles; ++t) {" << std::endl;
+  ss << "for (int_tp t = 0; t < v_num_tiles; ++t) {" << std::endl;
 
   // Load one tile of A into local memory
   ss << "{" << std::endl;  // Scoping for loading A
@@ -1703,6 +1728,19 @@ void LibDNNConv<Dtype>::Backward(bool prop_down_data, bool prop_down_weights,
     LibDNN<Dtype>::SetMemory(bottom_diff, ims, 0, (Dtype) 0);
   }
 
+  if (prop_down_weights && wgalgo_ == LIBDNN_CONVOLUTION_WG_ALGO_ATOMIC) {
+    int_tp wms = fmaps_in_ * fmaps_out_;
+    for (int_tp i = 0; i < kernel_shape_.size(); ++i) {
+      wms *= kernel_shape_[i];
+    }
+    LibDNN<Dtype>::SetMemory(bottom_diff, wms, 0, (Dtype) 0);
+  }
+
+  if (bias_term_ && prop_down_weights &&
+      wgalgo_ == LIBDNN_CONVOLUTION_WG_ALGO_ATOMIC) {
+    LibDNN<Dtype>::SetMemory(bias_diff, fmaps_out_, 0, (Dtype) 0);
+  }
+
 #ifdef USE_GREENTEA
   if (LibDNN<Dtype>::dev_ptr_->backend() == BACKEND_OpenCL) {
     // Backprop w.r.t. data
@@ -1859,7 +1897,7 @@ void LibDNNConv<Dtype>::Tune(Dtype* top_data, Dtype* top_diff, Dtype* weight,
   fw_tuner_->set_setup_routine([&]() -> bool {
     try {
       self->GenerateKernels();
-      return self->LibDNN<Dtype>::CompileKernels();
+      return self->CompileKernels();
     } catch(...) {
       return false;
     }
@@ -1912,7 +1950,7 @@ void LibDNNConv<Dtype>::Tune(Dtype* top_data, Dtype* top_diff, Dtype* weight,
   wg_tuner_->set_setup_routine([&]() -> bool {
     try {
       self->GenerateKernels();
-      return self->LibDNN<Dtype>::CompileKernels();
+      return self->CompileKernels();
     } catch(...) {
       return false;
     }

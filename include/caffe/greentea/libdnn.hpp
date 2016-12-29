@@ -1,6 +1,7 @@
 #ifndef CAFFE_GREENTEA_LIBDNN_HPP_
 #define CAFFE_GREENTEA_LIBDNN_HPP_
 
+#include <iomanip>
 #include <memory>
 #include <string>
 #include <vector>
@@ -170,6 +171,8 @@ class LibDNNConv : public LibDNN<Dtype> {
             Dtype* bottom_data, Dtype* bottom_diff,
             int_tp batch_size);
 
+  const LibDNNConvConfig get_config();
+
  protected:
   void GenerateKernels();
   std::string string_identifier();
@@ -185,6 +188,8 @@ class LibDNNConv : public LibDNN<Dtype> {
   std::string generate_wg_kernels(std::string name);
 
  private:
+  LibDNNConvConfig config_;
+
   // Autotuners
   std::shared_ptr<LibDNNTuner> fw_tuner_;
   std::shared_ptr<LibDNNTuner> bw_tuner_;
@@ -253,7 +258,7 @@ struct LibDNNPoolConfig {
   bool use_top_mask = false;
   bool fast_unsafe_math = false;
   libdnnPoolingMethod_t pool_method = LIBDNN_POOLING_METHOD_MAX;
-  libdnnPoolingBackwardAlgo_t pool_bw_algo = LIBDNN_POOLING_BW_ALGO_ATOMIC;
+  libdnnPoolingBackwardAlgo_t bwalgo = LIBDNN_POOLING_BW_ALGO_ATOMIC;
   bool global_pooling = false;
   std::function<void*(void**, const uint_tp, const int_tp)>
       memory_allocator = nullptr;
@@ -272,11 +277,9 @@ class LibDNNPool : public LibDNN<Dtype> {
                 const int_tp* mask, const Dtype* top_mask,
                 const Dtype* rand_idx);
 
- protected:
-  void Forward(const Dtype* bottom_data, Dtype* top_data,
-               int_tp channels, int_tp batch_size,
-               bool test_mode);
+  const LibDNNPoolConfig get_config();
 
+ protected:
   void GenerateKernels();
   std::string string_identifier();
   std::string generate_fw_defs();
@@ -287,6 +290,8 @@ class LibDNNPool : public LibDNN<Dtype> {
   std::string generate_bw_kernels(std::string name);
 
  private:
+  LibDNNPoolConfig config_;
+
   // Autotuners
   std::shared_ptr<LibDNNTuner> fw_tuner_;
   std::shared_ptr<LibDNNTuner> bw_tuner_;
@@ -308,7 +313,7 @@ class LibDNNPool : public LibDNN<Dtype> {
   // Compile and method flags
   bool skip_range_check_;
   libdnnPoolingMethod_t pool_method_;
-  libdnnPoolingBackwardAlgo_t pool_bw_algo_;
+  libdnnPoolingBackwardAlgo_t bwalgo_;
   bool use_top_mask_;
 };
 

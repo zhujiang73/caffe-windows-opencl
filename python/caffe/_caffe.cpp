@@ -1,5 +1,3 @@
-#include <Python.h>  // NOLINT(build/include_alpha)
-
 // Produce deprecation warnings (needs to come before arrayobject.h inclusion).
 #define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 
@@ -40,6 +38,46 @@
     bp::register_ptr_to_python<shared_ptr<PTR > >(); \
   } \
 } while (0)
+
+#if defined(_MSC_VER) && (_MSC_FULL_VER >= 190024210)
+// Workaround for VS 2015 Update 3 which breaks boost python
+// See: http://stackoverflow.com/questions/38261530/unresolved-external-symbols-since-visual-studio-2015-update-3-boost-python-link
+// and https://msdn.microsoft.com/vs-knownissues/vs2015-update3
+#define BP_GET_POINTER_TEMPLATED(cls, dtype) \
+namespace boost { \
+template <> \
+caffe::cls<dtype> const volatile * \
+get_pointer<class caffe::cls<dtype> const volatile >( \
+  class caffe::cls<dtype> const volatile *c) { \
+    return c; \
+} \
+}
+
+#define BP_GET_POINTER_BARE(cls) \
+namespace boost { \
+template <> \
+caffe::cls const volatile * \
+get_pointer<class caffe::cls const volatile >( \
+  class caffe::cls const volatile *c) { \
+    return c; \
+} \
+}
+
+BP_GET_POINTER_TEMPLATED(Net, float);
+BP_GET_POINTER_TEMPLATED(Layer, float);
+BP_GET_POINTER_TEMPLATED(Solver, float);
+BP_GET_POINTER_TEMPLATED(SGDSolver, float);
+BP_GET_POINTER_TEMPLATED(NesterovSolver, float);
+BP_GET_POINTER_TEMPLATED(AdaGradSolver, float);
+BP_GET_POINTER_TEMPLATED(RMSPropSolver, float);
+BP_GET_POINTER_TEMPLATED(AdaDeltaSolver, float);
+BP_GET_POINTER_TEMPLATED(AdamSolver, float);
+
+BP_GET_POINTER_BARE(LayerParameter);
+BP_GET_POINTER_BARE(NetParameter);
+BP_GET_POINTER_BARE(NetState);
+
+#endif
 
 namespace bp = boost::python;
 
@@ -275,9 +313,15 @@ struct NdarrayCallPolicies : public bp::default_call_policies {
     void* data = PyArray_DATA(reinterpret_cast<PyArrayObject*>(result));
     Py_DECREF(result);
     const int_tp num_axes = blob->num_axes();
+#ifdef USE_INDEX64
     vector<npy_long> dims(blob->shape().begin(), blob->shape().end());
     PyObject *arr_obj = PyArray_SimpleNewFromData(num_axes, dims.data(),
                                                   NPY_FLOAT32, data);
+#else
+    vector<npy_intp> dims(blob->shape().begin(), blob->shape().end());
+    PyObject *arr_obj = PyArray_SimpleNewFromData(num_axes, dims.data(),
+                                                  NPY_FLOAT32, data);
+#endif
     // SetBaseObject steals a ref, so we need to INCREF.
     Py_INCREF(pyblob.ptr());
     PyArray_SetBaseObject(reinterpret_cast<PyArrayObject*>(arr_obj),

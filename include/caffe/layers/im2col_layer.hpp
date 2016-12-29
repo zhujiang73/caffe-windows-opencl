@@ -21,11 +21,6 @@ class Im2colLayer : public Layer<Dtype> {
  public:
   explicit Im2colLayer(const LayerParameter& param)
       : Layer<Dtype>(param) {}
-
-  virtual ~Im2colLayer() {
-     //LOG(INFO) << "caffe ~Im2colLayer debug ...";  
-  }
-
   virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top);
   virtual void Reshape(const vector<Blob<Dtype>*>& bottom,

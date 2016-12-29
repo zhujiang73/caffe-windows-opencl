@@ -1,7 +1,7 @@
 # The option allows to include in build only selected test files and exclude all others
 # Usage example:
 #  cmake -DBUILD_only_tests="common,net,blob,im2col_kernel"
-set(BUILD_only_tests "" CACHE STRING "Blank or comma-separated list of test files to build without 'test_' prefix and extention")
+set(BUILD_only_tests "" CACHE STRING "Blank or comma-separated list of test files to build without 'test_' prefix and extension")
 caffe_leave_only_selected_tests(test_srcs ${BUILD_only_tests})
 caffe_leave_only_selected_tests(test_cuda ${BUILD_only_tests})
 
@@ -31,7 +31,7 @@ endif()
 
 # ---[ Adding test target
 add_executable(${the_target} EXCLUDE_FROM_ALL ${test_srcs})
-target_link_libraries(${the_target} gtest ${Caffe_LINK})
+target_link_libraries(${the_target} gtest proto ${Caffe_LINK})
 caffe_default_properties(${the_target})
 caffe_set_runtime_directory(${the_target} "${PROJECT_BINARY_DIR}/test")
 

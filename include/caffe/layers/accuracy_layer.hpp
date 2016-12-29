@@ -28,11 +28,6 @@ class AccuracyLayer : public Layer<Dtype> {
    */
   explicit AccuracyLayer(const LayerParameter& param)
       : Layer<Dtype>(param) {}
-
-  virtual ~AccuracyLayer() {
-     //LOG(INFO) << "caffe ~AccuracyLayer debug ...";  
-  }
-
   virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top);
   virtual void Reshape(const vector<Blob<Dtype>*>& bottom,

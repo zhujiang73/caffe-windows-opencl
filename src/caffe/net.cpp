@@ -56,8 +56,8 @@ void Net<Dtype>::Init(const NetParameter& in_param) {
   NetParameter filtered_param;
   FilterNet(in_param, &filtered_param);
   if (Caffe::root_solver()) {
-    LOG(INFO) << "Initializing net from parameters: " << std::endl
-              << filtered_param.DebugString();
+    //LOG(INFO) << "Initializing net from parameters: " << std::endl << filtered_param.DebugString();
+    LOG(INFO) << "Initializing net from parameters ... ";
   }
   // Create a copy of filtered_param with splits added where necessary.
   NetParameter param;
@@ -304,12 +304,6 @@ void Net<Dtype>::Init(const NetParameter& in_param) {
     LOG(INFO) << "Network initialization done.";
     LOG(INFO) << "Memory required for data: " << memory_used_ * sizeof(Dtype);
   }
-
-  //for (int n=0; n<layers_.size(); n++) {
-	//LOG(INFO) << layers_[n]->type();
-  //}
-  
-  //this->set_debug_info(true);
 }
 
 template<typename Dtype>
@@ -614,7 +608,6 @@ const vector<Blob<Dtype>*>& Net<Dtype>::Forward(Dtype* loss) {
     *loss = ForwardFromTo(0, layers_.size() - 1);
   } else {
     ForwardFromTo(0, layers_.size() - 1);
-    //LOG(INFO) << "Forward debug layers_.size " << layers_.size();
   }
   return net_output_blobs_;
 }

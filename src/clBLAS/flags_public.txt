@@ -1,4 +1,0 @@
-TAHITI_OCL " ";
-HAWAII1_OCL " ";
-HAWAII2_OCL "-cl-std=CL2.0";
-BONAIRE_OCL "-cl-std=CL2.0";

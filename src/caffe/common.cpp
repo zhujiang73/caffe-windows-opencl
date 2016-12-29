@@ -1,3 +1,8 @@
+#if defined(_MSC_VER)
+#include <process.h>
+#define getpid() _getpid()
+#endif
+
 #include <boost/thread.hpp>
 #include <glog/logging.h>
 
@@ -76,7 +81,11 @@ void GlobalInit(int* pargc, char*** pargv) {
   // Google logging.
   ::google::InitGoogleLogging(*(pargv)[0]);
   // Provide a backtrace on segfault.
+
+  // Windows port of glogs doesn't have this function built
+#if !defined(_MSC_VER)
   ::google::InstallFailureSignalHandler();
+#endif
 }
 
 
@@ -264,9 +273,7 @@ Caffe::~Caffe() {
   // Make sure all device contexts and
   // dependent memory blocks are freed properly
   if (this == global_instance_) {
-      //LOG(INFO) << "OpenCL  devices clear debug01:  ...   " << devices_.size();
       devices_.clear();
-      //LOG(INFO) << "OpenCL  devices clear debug02:  ...   " << devices_.size();
   }
 #ifdef USE_CUDA
   if (cublas_handle_)
@@ -417,7 +424,10 @@ int Caffe::EnumerateDevices(bool silent) {
   return cuda_device_count + greentea_device_count;
 }
 
+#define  ZJ_MINGW_20161228_DEBUG
+#ifdef   ZJ_MINGW_20161228_DEBUG
 void Caffe::SetDevices(std::vector<int> device_ids) {
+  LOG(INFO) << "ZJ_MINGW_20161228_DEBUG "  << "Caffe::SetDevices ... ";
   int initcount = 0;
   Get().devices_.clear();
   int cuda_device_count = 0;
@@ -479,6 +489,78 @@ void Caffe::SetDevices(std::vector<int> device_ids) {
 
   //std::cout << viennacl::ocl::current_device().info() << std::endl;
 }
+
+#else  //ZJ_MINGW_20161228_DEBUG
+void Caffe::SetDevices(std::vector<int> device_ids) {
+  int initcount = 0;
+  Get().devices_.clear();
+  int cuda_device_count = 0;
+#ifdef USE_CUDA
+  cudaGetDeviceCount(&cuda_device_count);
+#endif  // USE_CUDA
+  for (int i = 0; i < cuda_device_count; ++i) {
+    for (int j = 0; j < device_ids.size(); ++j) {
+      if (device_ids[j] == i) {
+        shared_ptr<device> dev(
+            new device(i, initcount, Backend::BACKEND_CUDA));
+        Get().devices_.emplace_back(dev);
+        dev->Init();
+        ++initcount;
+      }
+    }
+  }
+
+  // Initialize GreenTea devices
+#ifdef USE_GREENTEA
+  int greentea_device_count = 0;
+
+  typedef std::vector<viennacl::ocl::platform> platforms_type;
+  platforms_type platforms = viennacl::ocl::get_platforms();
+
+  std::vector< std::tuple<viennacl::ocl::platform,
+      viennacl::ocl::device> > platform_devices;
+
+  // Loop through devices
+  for (int platform_id = 0; platform_id < platforms.size();
+      ++platform_id) {
+    typedef std::vector<viennacl::ocl::device> devices_type;
+    try {
+      devices_type devices = platforms[platform_id].devices(
+      CL_DEVICE_TYPE_ALL);
+      for (int device_id = 0; device_id < devices.size(); ++device_id) {
+        platform_devices.push_back(
+            std::make_tuple(platforms[platform_id], devices[device_id]));
+        // Check if this device is really used and initialize
+        for (int i = 0; i < device_ids.size(); ++i) {
+          int device_id = device_ids[i];
+          if (device_id == cuda_device_count + greentea_device_count) {
+            // Setup actual context and compile kernels for this device
+            viennacl::ocl::setup_context(
+                device_id,
+                std::get<1>(platform_devices[greentea_device_count]));
+
+            shared_ptr<device> dev(
+                new device(device_id,
+                                  initcount, Backend::BACKEND_OpenCL));
+            Get().devices_.emplace_back(dev);
+            dev->Init();
+            ++initcount;
+          }
+        }
+        greentea_device_count++;
+      }
+    } catch (...) {
+      LOG(INFO)<< "OpenCL platform: "
+      << platforms[platform_id].info()
+      << " does not work correctly.";
+    }
+  }
+#endif  // USE_GREENTEA
+
+  Get().default_device_ = GetDevice(0, true);
+  Caffe::SelectDevice(Get().default_device_);
+}
+#endif  //ZJ_MINGW_20161228_DEBUG
 
 void Caffe::SetDevice(const int device_id) {
   // Fix for compability to python and other interfaces that do not

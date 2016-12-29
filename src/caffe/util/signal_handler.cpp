@@ -11,31 +11,35 @@ namespace {
   static volatile sig_atomic_t got_sighup = false;
   static bool already_hooked_up = false;
 
-void handle_signal(int signal) {
+  void handle_signal(int signal) {
     switch (signal) {
 #ifdef _WIN32
-    case SIGTERM:
-    case SIGABRT:
-    case SIGBREAK:
-#else
-    case SIGHUP:
-#endif
+    case SIGBREAK:  // there is no SIGHUP in windows, take SIGBREAK instead.
       got_sighup = true;
       break;
+#else
+    case SIGHUP:
+      got_sighup = true;
+      break;
+#endif
     case SIGINT:
       got_sigint = true;
       break;
     }
   }
-void HookupHandler() {
+
+  void HookupHandler() {
     if (already_hooked_up) {
       LOG(FATAL) << "Tried to hookup signal handlers more than once.";
     }
     already_hooked_up = true;
 #ifdef _WIN32
-    signal(SIGINT, handle_signal);
-    signal(SIGTERM, handle_signal);
-    signal(SIGABRT, handle_signal);
+    if (signal(SIGBREAK, handle_signal) == SIG_ERR) {
+      LOG(FATAL) << "Cannot install SIGBREAK handler.";
+    }
+    if (signal(SIGINT, handle_signal) == SIG_ERR) {
+      LOG(FATAL) << "Cannot install SIGINT handler.";
+    }
 #else
     struct sigaction sa;
     // Setup the handler
@@ -53,12 +57,17 @@ void HookupHandler() {
     }
 #endif
   }
- void UnhookHandler() {
+
+  // Set the signal handlers to the default.
+  void UnhookHandler() {
     if (already_hooked_up) {
 #ifdef _WIN32
-        signal(SIGINT, SIG_DFL);
-        signal(SIGTERM, SIG_DFL);
-        signal(SIGABRT, SIG_DFL);
+      if (signal(SIGBREAK, SIG_DFL) == SIG_ERR) {
+        LOG(FATAL) << "Cannot uninstall SIGBREAK handler.";
+      }
+      if (signal(SIGINT, SIG_DFL) == SIG_ERR) {
+        LOG(FATAL) << "Cannot uninstall SIGINT handler.";
+      }
 #else
       struct sigaction sa;
       // Setup the sighub handler
@@ -75,7 +84,6 @@ void HookupHandler() {
         LOG(FATAL) << "Cannot uninstall SIGINT handler.";
       }
 #endif
-
       already_hooked_up = false;
     }
   }

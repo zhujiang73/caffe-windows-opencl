@@ -24,11 +24,6 @@ class LossLayer : public Layer<Dtype> {
  public:
   explicit LossLayer(const LayerParameter& param)
      : Layer<Dtype>(param) {}
-
-  virtual ~LossLayer() {
-     //LOG(INFO) << "caffe ~LossLayer debug ...";  
-  }
-
   virtual void LayerSetUp(
       const vector<Blob<Dtype>*>& bottom, const vector<Blob<Dtype>*>& top);
   virtual void Reshape(
