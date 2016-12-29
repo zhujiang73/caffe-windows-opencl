@@ -49,10 +49,6 @@ include_directories(BEFORE "${PROJECT_SOURCE_DIR}")
 # Subdirectories
 ################
 
-if(BUILD_EXAMPLES)
-   add_subdirectory(examples)
-endif()
-
 # Install
 #########
 
