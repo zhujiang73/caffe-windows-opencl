@@ -102,7 +102,7 @@ SyncedMemory::~SyncedMemory() {
           << "OpenCL memory corruption";
       gpu_ptr_ = nullptr;
       cl_gpu_mem_ = nullptr;
-      ctx.get_queue().finish();
+      //ctx.get_queue().finish();
       if (own_zero_copy_data_ && own_cpu_data_ && cpu_ptr_) {
         CaffeFreeHost(cpu_ptr_, device_);
         cpu_ptr_ = nullptr;
