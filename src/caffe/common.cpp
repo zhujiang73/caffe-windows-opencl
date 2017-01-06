@@ -88,7 +88,6 @@ void GlobalInit(int* pargc, char*** pargv) {
 #endif
 }
 
-
 device *Caffe::GetDevice(int id, bool listId) {
   if (listId) {
     return
@@ -362,7 +361,8 @@ int Caffe::EnumerateDevices(bool silent) {
       ++platform_id) {
     typedef std::vector<viennacl::ocl::device> devices_type;
     try {
-      devices_type devices = platforms[platform_id].devices(CL_DEVICE_TYPE_ALL);
+      //devices_type devices = platforms[platform_id].devices(CL_DEVICE_TYPE_ALL);
+      devices_type devices = platforms[platform_id].devices(CL_DEVICE_TYPE_GPU);
       for (std::size_t device_id = 0; device_id < devices.size(); ++device_id) {
         platform_devices.push_back(
             std::make_tuple(platforms[platform_id], devices[device_id]));
@@ -424,7 +424,7 @@ int Caffe::EnumerateDevices(bool silent) {
   return cuda_device_count + greentea_device_count;
 }
 
-#define  ZJ_MINGW_20161228_DEBUG
+//#define  ZJ_MINGW_20161228_DEBUG
 #ifdef   ZJ_MINGW_20161228_DEBUG
 void Caffe::SetDevices(std::vector<int> device_ids) {
   LOG(INFO) << "ZJ_MINGW_20161228_DEBUG "  << "Caffe::SetDevices ... ";
@@ -525,8 +525,8 @@ void Caffe::SetDevices(std::vector<int> device_ids) {
       ++platform_id) {
     typedef std::vector<viennacl::ocl::device> devices_type;
     try {
-      devices_type devices = platforms[platform_id].devices(
-      CL_DEVICE_TYPE_ALL);
+      //devices_type devices = platforms[platform_id].devices(CL_DEVICE_TYPE_ALL);
+      devices_type devices = platforms[platform_id].devices(CL_DEVICE_TYPE_GPU);
       for (int device_id = 0; device_id < devices.size(); ++device_id) {
         platform_devices.push_back(
             std::make_tuple(platforms[platform_id], devices[device_id]));
@@ -544,6 +544,9 @@ void Caffe::SetDevices(std::vector<int> device_ids) {
                                   initcount, Backend::BACKEND_OpenCL));
             Get().devices_.emplace_back(dev);
             dev->Init();
+
+            std::cout << viennacl::ocl::current_device().info() << std::endl;
+
             ++initcount;
           }
         }
@@ -555,6 +558,7 @@ void Caffe::SetDevices(std::vector<int> device_ids) {
       << " does not work correctly.";
     }
   }
+
 #endif  // USE_GREENTEA
 
   Get().default_device_ = GetDevice(0, true);

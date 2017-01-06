@@ -44,8 +44,8 @@ set_gpu = 1
 
 if set_gpu:
 	caffe.set_mode_gpu()
-   	#caffe.set_device(0)
-   	caffe.set_device(1)
+   	caffe.set_device(0)
+   	#caffe.set_device(1)
    	caffe.select_device(0, True)
    	print("GPU mode")
 else:
@@ -81,12 +81,12 @@ out = net.forward()
 print("Caffe Done in %.2f s." % (time.time() - start))
 
 data = [(k, v.data.shape) for k, v in net.blobs.items()]
-print("data")
-print(data)
+#print("data")
+#print(data)
 
 params = [(k, v[0].data.shape) for k, v in net.params.items()]
-print("params")
-print(params)
+#print("params")
+#print(params)
 plt.figure()
 plt.subplot(1,2,1),plt.title("origin")
 plt.imshow(im)
@@ -104,7 +104,6 @@ feat = net.blobs['prob'].data[0]
 #print feat
 plt.figure(4)
 plt.plot(feat.flat)
-plt.axis('off')
 
 imagenet_labels_filename = ".\\data\\synset_words.txt"
 labels = np.loadtxt(imagenet_labels_filename, str, delimiter='\t')
