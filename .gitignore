@@ -65,6 +65,7 @@ Makefile.config
 # 1. reference, and not casually committed
 # 2. custom, and live on their own unless they're deliberated contributed
 data/
+examples/
 models/*
 *.caffemodel
 *.caffemodel.h5
