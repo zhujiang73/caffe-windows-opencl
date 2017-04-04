@@ -66,7 +66,7 @@ Makefile.config
 # 2. custom, and live on their own unless they're deliberated contributed
 data/
 examples/
-models/*
+models/
 *.caffemodel
 *.caffemodel.h5
 *.solverstate
@@ -93,11 +93,4 @@ _site
 doxygen
 docs/dev
 
-# LevelDB files
-*.sst
-*.ldb
-LOCK
-LOG*
-CURRENT
-MANIFEST-*
 
