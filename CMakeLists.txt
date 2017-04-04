@@ -4,8 +4,8 @@ cmake_minimum_required(VERSION 3.4)
 project(Caffe C CXX)
 
 # ---[ Caffe version
-set(CAFFE_TARGET_VERSION "1.0.0-rc5" CACHE STRING "Caffe logical version")
-set(CAFFE_TARGET_SOVERSION "1.0.0-rc5" CACHE STRING "Caffe soname version")
+set(CAFFE_TARGET_VERSION "1.0.0-rc5_mingw" CACHE STRING "Caffe logical version")
+set(CAFFE_TARGET_SOVERSION "1.0.0-rc5_mingw" CACHE STRING "Caffe soname version")
 add_definitions(-DCAFFE_VERSION=${CAFFE_TARGET_VERSION})
 
 # This code is taken from https://github.com/sh1r0/caffe-android-lib
