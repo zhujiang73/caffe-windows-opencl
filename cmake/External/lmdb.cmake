@@ -33,8 +33,9 @@ if (NOT __LMDB_INCLUDED) # guard against multiple includes
 
     list(APPEND external_project_dependencies lmdb)
 
-    FILE(GLOB_RECURSE LMDB_H "${CMAKE_BINARY_DIR}/external/lmdb-install/include/*.h")
+    FILE(GLOB_RECURSE LMDB_H  ${CMAKE_SOURCE_DIR}/src/lmdb/src/*.h)
     INSTALL(FILES  ${LMDB_H}  DESTINATION include)
+
     INSTALL(FILES  ${CMAKE_BINARY_DIR}/external/lmdb-install/lib/liblmdb.a DESTINATION lib)
 
 endif()
