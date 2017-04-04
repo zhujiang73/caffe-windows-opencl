@@ -4,9 +4,23 @@ cmake_minimum_required(VERSION 3.4)
 project(Caffe C CXX)
 
 # ---[ Caffe version
-set(CAFFE_TARGET_VERSION "1.0.0-rc3" CACHE STRING "Caffe logical version")
-set(CAFFE_TARGET_SOVERSION "1.0.0-rc3" CACHE STRING "Caffe soname version")
+set(CAFFE_TARGET_VERSION "1.0.0-rc5" CACHE STRING "Caffe logical version")
+set(CAFFE_TARGET_SOVERSION "1.0.0-rc5" CACHE STRING "Caffe soname version")
 add_definitions(-DCAFFE_VERSION=${CAFFE_TARGET_VERSION})
+
+# This code is taken from https://github.com/sh1r0/caffe-android-lib
+# Search packages for host system instead of packages for target system
+# in case of cross compilation these macro should be defined by toolchain file
+if(NOT COMMAND find_host_package)
+  macro(find_host_package)
+    find_package(${ARGN})
+  endmacro()
+endif()
+if(NOT COMMAND find_host_program)
+  macro(find_host_program)
+    find_program(${ARGN})
+  endmacro()
+endif()
 
 # ---[ Using cmake scripts and modules
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/Modules)
@@ -15,6 +29,8 @@ set(PYTHON_LIBRARY        "C:/msys64/mingw64/lib/libpython2.7.dll.a")
 set(PYTHON_INCLUDE_DIR    "C:/msys64/mingw64/include/python2.7")
 
 include(ExternalProject)
+
+include(cmake/External/glog.cmake)
 include(cmake/External/lmdb.cmake)
 include(cmake/External/ViennaCL.cmake)
 
@@ -24,6 +40,7 @@ include(cmake/Misc.cmake)
 include(cmake/Summary.cmake)
 include(cmake/ConfigGen.cmake)
 include(cmake/WindowsCreateLinkHeader.cmake)
+include(cmake/TargetResolvePrerequesites.cmake)
 
 # ---[ Options
 caffe_option(CPU_ONLY "Build Caffe without CUDA and OpenCL support" OFF)
@@ -35,6 +52,7 @@ caffe_option(USE_CLBLAS "Build Caffe with clBLAS support (instead of using Vienn
 caffe_option(USE_CLBLAST "Build Caffe with CLBlast support (instead of using ViennaClBLAS)" OFF)
 caffe_option(USE_ISAAC "Build Caffe with ISAAC support (instead of using ViennaClBLAS)" OFF)
 caffe_option(USE_CUDNN "Build Caffe with cuDNN library support" OFF)
+caffe_option(USE_NCCL "Build Caffe with NCCL library support" OFF)
 caffe_option(BUILD_SHARED_LIBS "Build shared libraries" ON)
 if(MSVC)
   # default to static libs
@@ -44,7 +62,7 @@ else()
 endif()
 caffe_option(BUILD_python "Build Python wrapper" ON)
 set(python_version "2" CACHE STRING "Specify which Python version to use")
-caffe_option(BUILD_matlab "Build Matlab wrapper" OFF IF UNIX OR APPLE)
+caffe_option(BUILD_matlab "Build Matlab wrapper" OFF)
 caffe_option(BUILD_docs   "Build documentation" ON IF UNIX OR APPLE)
 caffe_option(BUILD_python_layer "Build the Caffe Python layer" ON)
 caffe_option(USE_OPENCV "Build with OpenCV support" ON)
@@ -69,8 +87,14 @@ if(USE_ISAAC)
 endif()
 
 caffe_option(protobuf_MODULE_COMPATIBLE "Make the protobuf-config.cmake compatible with the module mode" ON IF MSVC)
+caffe_option(COPY_PREREQUISITES "Copy the prerequisites next to each executable or shared library directory" ON IF MSVC)
+caffe_option(INSTALL_PREREQUISITES "Install the prerequisites next to each executable or shared library directory" ON IF MSVC)
 
 if(MSVC AND BUILD_SHARED_LIBS)
+  if(CMAKE_GENERATOR MATCHES "Visual Studio")
+    # see issue https://gitlab.kitware.com/cmake/cmake/issues/16552#note_215236
+    message(FATAL_ERROR "The Visual Studio generator cannot build a shared library. Use the Ninja generator instead.")
+  endif()
   # Some tests (solver tests) fail when caffe is built as a shared library. The problem comes
   # from protobuf that has a global static empty_string_ variable. Since caffe and test.testbin
   # link to a static protobuf library both end up with their own instance of the empty_string_
@@ -79,15 +103,36 @@ if(MSVC AND BUILD_SHARED_LIBS)
   message(WARNING "Some tests (solvers) will fail when building as a shared library with MSVC")
 endif()
 
+# ---[ Prebuild dependencies on windows
+include(cmake/WindowsDownloadPrebuiltDependencies.cmake)
+
+# This code is taken from https://github.com/sh1r0/caffe-android-lib
+caffe_option(USE_HDF5 "Build with hdf5" ON)
+if(ANDROID)
+  set(CMAKE_FIND_LIBRARY_SUFFIXES ".a;.so")
+  caffe_enable_cpp11_support()
+endif()
+
+
 # ---[ Dependencies
 include(cmake/Dependencies.cmake)
 
 # ---[ Flags
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -fPIC -Wa,-mbig-obj")
+if(DISABLE_DEVICE_HOST_UNIFIED_MEMORY)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DDISABLE_DEVICE_HOST_UNIFIED_MEMORY")
+endif()
 
-# ---[ Warnings
-#caffe_warnings_disable(CMAKE_CXX_FLAGS -Wno-sign-compare -Wno-uninitialized)
-caffe_warnings_disable(CMAKE_CXX_FLAGS -Wno-sign-compare -Wno-deprecated-declarations -Wno-ignored-attributes -Wno-uninitialized)
+if(UNIX OR APPLE)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -Wall -std=c++11 -DCMAKE_BUILD")
+endif()
+
+if(DISABLE_DOUBLE_SUPPORT)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DDISABLE_DOUBLE_SUPPORT")
+endif()
+
+if(MSVC)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /MP")
+endif()
 
 caffe_set_caffe_link()
 
@@ -100,11 +145,9 @@ if(USE_INDEX_64)
   list(APPEND Caffe_DEFINITIONS PUBLIC -DUSE_INDEX_64)
 endif()
 
-if(NOT MSVC)
-  add_definitions(-DGTEST_USE_OWN_TR1_TUPLE)
-endif()
-
-
+# ---[ Warnings
+#caffe_warnings_disable(CMAKE_CXX_FLAGS -Wno-sign-compare -Wno-uninitialized)
+caffe_warnings_disable(CMAKE_CXX_FLAGS -Wno-sign-compare -Wno-deprecated-declarations -Wno-ignored-attributes -Wno-uninitialized)
 
 # ---[ Config generation
 configure_file(cmake/Templates/caffe_config.h.in "${PROJECT_BINARY_DIR}/caffe_config.h")
@@ -128,13 +171,22 @@ list(REMOVE_ITEM Caffe_ALL_INCLUDE_DIRS PRIVATE PUBLIC)
 set(Caffe_ALL_DEFINITIONS ${Caffe_DEFINITIONS})
 list(REMOVE_ITEM Caffe_ALL_DEFINITIONS PRIVATE PUBLIC)
 
+if(HAVE_CUDA)
+  # pass include paths to cuda_include_directories()
+  cuda_include_directories(${Caffe_INCLUDE_DIR} ${Caffe_SRC_DIR} ${Caffe_ALL_INCLUDE_DIRS})
+  # add definitions to nvcc flags directly
+  list(APPEND CUDA_NVCC_FLAGS ${Caffe_ALL_DEFINITIONS})
+endif()
+
 # ---[ Subdirectories
 add_subdirectory(src/gtest)
 add_subdirectory(src/caffe)
 add_subdirectory(tools)
 add_subdirectory(examples)
+# This code is taken from https://github.com/sh1r0/caffe-android-lib
+#add_subdirectory(android)
 add_subdirectory(python)
-add_subdirectory(matlab)
+#add_subdirectory(matlab)
 add_subdirectory(docs)
 
 # ---[ Linter target
@@ -156,4 +208,3 @@ caffe_print_configuration_summary()
 
 # ---[ Export configs generation
 caffe_generate_export_configs()
-

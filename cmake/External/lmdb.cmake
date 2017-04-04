@@ -25,7 +25,7 @@ if (NOT __LMDB_INCLUDED) # guard against multiple includes
                  -DCMAKE_CXX_FLAGS=${lmdb_CXX_FLAGS}
       )
 
-    set(lmdb_FOUND TRUE)
+    set(LMDB_FOUND TRUE)
     set(LMDB_INCLUDE_DIR ${lmdb_INSTALL}/include)
     set(LMDB_LIBRARIES ${lmdb_INSTALL}/lib/liblmdb.a)
     set(lmdb_LIBRARY_DIRS ${lmdb_INSTALL}/lib)
@@ -33,8 +33,8 @@ if (NOT __LMDB_INCLUDED) # guard against multiple includes
 
     list(APPEND external_project_dependencies lmdb)
 
-    INSTALL(FILES  ${CMAKE_BINARY_DIR}/external/lmdb-install/include/lmdb.h DESTINATION include)
-    INSTALL(FILES  ${CMAKE_BINARY_DIR}/external/lmdb-install/include/midl.h DESTINATION include)
+    FILE(GLOB LMDB_H "${CMAKE_BINARY_DIR}/external/lmdb-install/include/*.h")
+    INSTALL(FILES  ${LMDB_H}  DESTINATION include)
     INSTALL(FILES  ${CMAKE_BINARY_DIR}/external/lmdb-install/lib/liblmdb.a DESTINATION lib)
 
 endif()

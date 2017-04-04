@@ -1,4 +1,5 @@
 
+include(CTest)
 include(CMakeDependentOption)
 include(AddCCompilerFlagIfSupported)
 include(AddCLinkerFlagIfSupported)
@@ -13,6 +14,19 @@ if(WIN32 AND NOT CYGWIN)
 else()
    set(DEF_INSTALL_CMAKE_DIR lib/cmake/viennacl)
 endif()
+set(INSTALL_CMAKE_DIR "${DEF_INSTALL_CMAKE_DIR}" CACHE PATH
+   "Installation directory for CMake files")
+
+if(NOT IS_ABSOLUTE "${INSTALL_CMAKE_DIR}")
+   set(INSTALL_CMAKE_DIR "${CMAKE_INSTALL_PREFIX}/${INSTALL_CMAKE_DIR}")
+endif()
+file(RELATIVE_PATH CONF_REL_INSTALL_PREFIX "${INSTALL_CMAKE_DIR}"
+   "${CMAKE_INSTALL_PREFIX}")
+if(NOT IS_ABSOLUTE "${INSTALL_INCLUDE_DIR}")
+   set(INSTALL_INCLUDE_DIR "${CMAKE_INSTALL_PREFIX}/${INSTALL_INCLUDE_DIR}")
+endif()
+file(RELATIVE_PATH CONF_REL_INCLUDE_DIR "${INSTALL_CMAKE_DIR}"
+   "${INSTALL_INCLUDE_DIR}")
 
 # User options
 ##############
@@ -26,6 +40,7 @@ option(ENABLE_OPENCL "Use the OpenCL backend" ON)
 option(ENABLE_OPENMP "Use OpenMP acceleration" OFF)
 
 option(ENABLE_ASAN "Build with address sanitizer if available" OFF)
+
 
 
 # If you want to build the examples that use boost::numeric::ublas, enable
@@ -156,6 +171,15 @@ configure_file(cmake/ViennaCLConfigVersion.cmake.in
 if (CMAKE_MINOR_VERSION GREATER 6)  # export(PACKAGE ...) introduced with CMake 2.8.0
   export(PACKAGE ViennaCL)
 endif()
+
+# Install
+#########
+
+install(FILES
+   "${PROJECT_BINARY_DIR}/FindOpenCL.cmake"
+   "${PROJECT_BINARY_DIR}/ViennaCLConfig.cmake"
+   "${PROJECT_BINARY_DIR}/ViennaCLConfigVersion.cmake"
+   DESTINATION "${INSTALL_CMAKE_DIR}" COMPONENT dev)
 
 
 # For out-of-the-box support on MacOS:

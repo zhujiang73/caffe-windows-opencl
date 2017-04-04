@@ -13,7 +13,7 @@ namespace {
 
   void handle_signal(int signal) {
     switch (signal) {
-#ifdef _WIN32
+#ifdef _WIN64
     case SIGBREAK:  // there is no SIGHUP in windows, take SIGBREAK instead.
       got_sighup = true;
       break;
@@ -33,7 +33,7 @@ namespace {
       LOG(FATAL) << "Tried to hookup signal handlers more than once.";
     }
     already_hooked_up = true;
-#ifdef _WIN32
+#ifdef _WIN64
     if (signal(SIGBREAK, handle_signal) == SIG_ERR) {
       LOG(FATAL) << "Cannot install SIGBREAK handler.";
     }
@@ -61,7 +61,7 @@ namespace {
   // Set the signal handlers to the default.
   void UnhookHandler() {
     if (already_hooked_up) {
-#ifdef _WIN32
+#ifdef _WIN64
       if (signal(SIGBREAK, SIG_DFL) == SIG_ERR) {
         LOG(FATAL) << "Cannot uninstall SIGBREAK handler.";
       }

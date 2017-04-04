@@ -23,7 +23,7 @@ macro(caffe_set_caffe_link)
     endif()
   endif()
 endmacro()
-################################################################################################ 
+################################################################################################
 # Convenient command to setup source group for IDEs that support this feature (VS, XCode)
 # Usage:
 #   caffe_source_group(<group> GLOB[_RECURSE] <globbing_expression>)
@@ -116,12 +116,13 @@ function(caffe_pickup_caffe_sources root)
   file(GLOB_RECURSE proto_files ${root}/src/caffe/*.proto)
   list(APPEND srcs ${proto_files})
 
+
   # OpenCL but not CUDA backend tweak
   if(USE_GREENTEA AND NOT USE_CUDA)
     SET_SOURCE_FILES_PROPERTIES(${cuda} PROPERTIES LANGUAGE CXX)
     SET_SOURCE_FILES_PROPERTIES(${test_cuda} PROPERTIES LANGUAGE CXX)
 	
-	if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+	if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
 		SET_SOURCE_FILES_PROPERTIES(${cuda} PROPERTIES COMPILE_FLAGS "-x c++")
 		SET_SOURCE_FILES_PROPERTIES(${test_cuda} PROPERTIES COMPILE_FLAGS "-x c++")
 	endif()
@@ -157,7 +158,7 @@ function(caffe_default_properties target)
     ARCHIVE_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/lib"
     LIBRARY_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/lib"
     RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/bin")
-  # make sure we build all external depepdencies first
+  # make sure we build all external dependencies first
   if (DEFINED external_project_dependencies)
     add_dependencies(${target} ${external_project_dependencies})
   endif()

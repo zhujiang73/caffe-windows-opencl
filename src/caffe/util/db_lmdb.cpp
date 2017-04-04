@@ -1,9 +1,9 @@
 #ifdef USE_LMDB
 #include "caffe/util/db_lmdb.hpp"
 
-#if defined(_WIN32)
+#if defined(_WIN64)
 //#include <direct.h>
-#define mkdir(X, Y) mkdir(X)
+#define LMDB_MKDIR(X, Y) mkdir(X)
 #endif
 
 #include <sys/stat.h>
@@ -15,7 +15,7 @@ namespace caffe { namespace db {
 void LMDB::Open(const string& source, Mode mode) {
   MDB_CHECK(mdb_env_create(&mdb_env_));
   if (mode == NEW) {
-    CHECK_EQ(mkdir(source.c_str(), 0744), 0) << "mkdir " << source << " failed";
+    CHECK_EQ(LMDB_MKDIR(source.c_str(), 0744), 0) << "mkdir " << source << " failed";
   }
   int_tp flags = 0;
   if (mode == READ) {
@@ -37,7 +37,7 @@ void LMDB::Open(const string& source, Mode mode) {
     MDB_CHECK(rc);
   }
 #endif
-  LOG(INFO) << "Opened lmdb " << source;
+  LOG_IF(INFO, Caffe::root_solver()) << "Opened lmdb " << source;
 }
 
 LMDBCursor* LMDB::NewCursor() {

@@ -29,6 +29,60 @@
 
 namespace caffe {
 
+
+size_t dtsizeof(DataType data_type) {
+  switch (data_type) {
+    case INT8:
+    case UINT8:
+      return 1;
+    case FP16:
+    case INT16:
+    case UINT16:
+      return 2;
+    case FP32:
+    case INT32:
+    case UINT32:
+      return 4;
+    case FP64:
+    case INT64:
+    case UINT64:
+      return 8;
+    default:
+      return 1;
+  }
+}
+
+template<> DataType dtypeof<float>() {
+  return FP32;
+}
+template<> DataType dtypeof<double>() {
+  return FP64;
+}
+template<> DataType dtypeof<int8_t>() {
+  return INT8;
+}
+template<> DataType dtypeof<int16_t>() {
+  return INT16;
+}
+template<> DataType dtypeof<int32_t>() {
+  return INT32;
+}
+template<> DataType dtypeof<int64_t>() {
+  return INT64;
+}
+template<> DataType dtypeof<uint8_t>() {
+  return UINT8;
+}
+template<> DataType dtypeof<uint16_t>() {
+  return UINT16;
+}
+template<> DataType dtypeof<uint32_t>() {
+  return UINT32;
+}
+template<> DataType dtypeof<uint64_t>() {
+  return UINT64;
+}
+
 // Make sure each thread can have different values.
 static boost::thread_specific_ptr<Caffe> thread_instance_;
 
@@ -88,6 +142,7 @@ void GlobalInit(int* pargc, char*** pargv) {
 #endif
 }
 
+
 device *Caffe::GetDevice(int id, bool listId) {
   if (listId) {
     return
@@ -125,12 +180,10 @@ Caffe::Caffe(const Caffe &obj)
       mode_(Caffe::CPU),
       cpu_device_(new device(-1, -1, Backend::BACKEND_CPU)),
       default_device_(cpu_device_.get()),
-      solver_count_(1),
-      root_solver_(true) {
+      solver_count_(1) {
   mode_ = obj.mode_;
   default_device_ = obj.default_device_;
   cpu_device_ = obj.cpu_device_;
-  root_solver_ = obj.root_solver_;
   solver_count_ = obj.solver_count_;
 }
 
@@ -192,8 +245,7 @@ Caffe::Caffe() : random_generator_(),
                  mode_(Caffe::CPU),
                  cpu_device_(new device(-1, -1, Backend::BACKEND_CPU)),
                  default_device_(cpu_device_.get()),
-                 solver_count_(1),
-                 root_solver_(true) {}
+                 solver_count_(1), solver_rank_(0), multiprocess_(false) { }
 
 Caffe::~Caffe() {}
 
@@ -265,7 +317,7 @@ Caffe::Caffe()
       mode_(Caffe::CPU),
       cpu_device_(new device(-1, -1, Backend::BACKEND_CPU)),
       default_device_(cpu_device_.get()),
-      solver_count_(1), root_solver_(true) {
+    solver_count_(1), solver_rank_(0), multiprocess_(false) {
 }
 
 Caffe::~Caffe() {
@@ -424,73 +476,6 @@ int Caffe::EnumerateDevices(bool silent) {
   return cuda_device_count + greentea_device_count;
 }
 
-//#define  ZJ_MINGW_20161228_DEBUG
-#ifdef   ZJ_MINGW_20161228_DEBUG
-void Caffe::SetDevices(std::vector<int> device_ids) {
-  LOG(INFO) << "ZJ_MINGW_20161228_DEBUG "  << "Caffe::SetDevices ... ";
-  int initcount = 0;
-  Get().devices_.clear();
-  int cuda_device_count = 0;
-#ifdef USE_CUDA
-  cudaGetDeviceCount(&cuda_device_count);
-  for (int i = 0; i < cuda_device_count; ++i) {
-    for (int j = 0; j < device_ids.size(); ++j) {
-      if (device_ids[j] == i) {
-        shared_ptr<device> dev(
-            new device(i, initcount, Backend::BACKEND_CUDA));
-        Get().devices_.emplace_back(dev);
-        dev->Init();
-        ++initcount;
-      }
-    }
-  }
-#endif  // USE_CUDA
-
-  // Initialize GreenTea devices
-#ifdef USE_GREENTEA
-  int greentea_device_count = 0;
-
-  typedef std::vector<viennacl::ocl::platform> platforms_type;
-  typedef std::vector<viennacl::ocl::device> devices_type;
-
-  platforms_type platforms = viennacl::ocl::get_platforms();
-
-  std::vector< std::tuple<viennacl::ocl::platform, viennacl::ocl::device> > platform_devices;
-
-  for (int platform_id = 0; platform_id < platforms.size(); ++platform_id) {
-	devices_type devices = platforms[platform_id].devices();
-	for (int device_id = 0; device_id < devices.size(); ++device_id) {
-		platform_devices.push_back(std::make_tuple(platforms[platform_id], devices[device_id]));
-        }
-  }
-
-  for (int i = 0; i < device_ids.size(); ++i){
-      try {  
-	int device_id = device_ids[i];
- 	viennacl::ocl::setup_context(i,std::get<1>(platform_devices[device_id]));
-
-        shared_ptr<device> dev(new device(i,initcount, Backend::BACKEND_OpenCL));
-        //shared_ptr<device> dev(new device(device_id,initcount, Backend::BACKEND_OpenCL));
-	std::cout << viennacl::ocl::current_device().info() << std::endl;
-              
-        Get().devices_.emplace_back(dev);
-        dev->Init();
-        ++initcount;
-      } catch (...) {
-      LOG(INFO)<< "OpenCL platform: "
-      << " does not work correctly.";
-      }
-  }
-
-#endif  // USE_GREENTEA
-
-  Get().default_device_ = GetDevice(0, true);
-  Caffe::SelectDevice(Get().default_device_);
-
-  //std::cout << viennacl::ocl::current_device().info() << std::endl;
-}
-
-#else  //ZJ_MINGW_20161228_DEBUG
 void Caffe::SetDevices(std::vector<int> device_ids) {
   int initcount = 0;
   Get().devices_.clear();
@@ -527,6 +512,7 @@ void Caffe::SetDevices(std::vector<int> device_ids) {
     try {
       //devices_type devices = platforms[platform_id].devices(CL_DEVICE_TYPE_ALL);
       devices_type devices = platforms[platform_id].devices(CL_DEVICE_TYPE_GPU);
+
       for (int device_id = 0; device_id < devices.size(); ++device_id) {
         platform_devices.push_back(
             std::make_tuple(platforms[platform_id], devices[device_id]));
@@ -544,9 +530,6 @@ void Caffe::SetDevices(std::vector<int> device_ids) {
                                   initcount, Backend::BACKEND_OpenCL));
             Get().devices_.emplace_back(dev);
             dev->Init();
-
-            std::cout << viennacl::ocl::current_device().info() << std::endl;
-
             ++initcount;
           }
         }
@@ -558,13 +541,11 @@ void Caffe::SetDevices(std::vector<int> device_ids) {
       << " does not work correctly.";
     }
   }
-
 #endif  // USE_GREENTEA
 
   Get().default_device_ = GetDevice(0, true);
   Caffe::SelectDevice(Get().default_device_);
 }
-#endif  //ZJ_MINGW_20161228_DEBUG
 
 void Caffe::SetDevice(const int device_id) {
   // Fix for compability to python and other interfaces that do not
