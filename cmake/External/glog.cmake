@@ -38,7 +38,7 @@ if (NOT __GLOG_INCLUDED)
 
     list(APPEND external_project_dependencies glog)
 	
-    FILE(GLOB GLOG_H "${CMAKE_BINARY_DIR}/external/glog-install/include/glog/*.h")
+    FILE(GLOB_RECURSE GLOG_H "${CMAKE_BINARY_DIR}/external/glog-install/include/glog/*.h")
     INSTALL(FILES  ${GLOG_H}  DESTINATION include/glog)
     INSTALL(FILES  ${CMAKE_BINARY_DIR}/external/glog-install/lib/libglog.dll.a  DESTINATION lib)
     INSTALL(FILES  ${CMAKE_BINARY_DIR}/external/glog-install/bin/libglog.dll  DESTINATION lib)
