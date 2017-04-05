@@ -9,6 +9,7 @@ import time
 import copy
 
 import StringIO
+from   collections import OrderedDict
 
 import sys
 sys.path.append('c:\\mingw\\python')
@@ -108,7 +109,8 @@ else:
 	net_full_conv = caffe.Net(net_file_fc, caffe_model_fc, caffe.TEST) 
 
 # load input and configure preprocessing
-img = caffe.io.load_image(".\\imgs\\cat.jpg")
+str_img_fn = ".\\imgs\\cat.jpg"
+img = caffe.io.load_image(str_img_fn)
 
 img_res = sktr.resize(img, (451, 451) )
 
@@ -130,17 +132,58 @@ print_data("blobs['pool5'].data.shape", net_full_conv.blobs['pool5'].data.shape)
 
 print ("out prob ...")
 #print out['prob'][0]
-print (out['prob'][0].argmax(axis=0) )
+print ( out['prob'][0].argmax(axis=0) )
+
+vals = out['prob'][0].argmax(axis=0)
+
+va_lists = []
+
+for vas in vals:
+	for va in vas:
+		va_lists.append(va)
+
+va_sets = set(va_lists)
+
+va_name_idx_maps = {}
+va_name_num_maps = {}
+
+for va in va_sets:
+	str_name = labels[va]
+	va_name_idx_maps[str_name] = va
+
+	num = 0
+	for ve_tmp in va_lists:
+		if (va == ve_tmp):
+			num = num+1
+
+	va_name_num_maps[str_name] = num	
+
+va_sort_maps = OrderedDict( sorted(va_name_num_maps.iteritems(), key=lambda d:d[1], reverse = True) )	
+
+str_names = []
+for  name in va_sort_maps.keys():	
+	str_names.append(name)
 
 str_title = "net_full_conv"
 
 # show net input and confidence map (probability of the top prediction at each location)
 plt.figure(str_title),plt.title(str_title)
-plt.subplot(1, 2, 1)
+
+str_title = "img_src : %s"%(str_img_fn)
+plt.subplot(2, 2, 1),plt.title(str_title)
 plt.imshow(transformer.deprocess('data', net_full_conv.blobs['data'].data[0]))
-plt.subplot(1, 2, 2)
-plt.imshow(out['prob'][0,281], plt.cm.hot)
-#plt.imshow(out['prob'][0,283], plt.cm.hot)
+
+plt.subplot(2, 2, 2),plt.title(str_names[0])
+idx = va_name_idx_maps[ str_names[0] ]
+plt.imshow(out['prob'][0, idx], plt.cm.hot)
+
+plt.subplot(2, 2, 3),plt.title(str_names[1])
+idx = va_name_idx_maps[ str_names[1] ]
+plt.imshow(out['prob'][0, idx], plt.cm.hot)
+
+plt.subplot(2, 2, 4),plt.title(str_names[2])
+idx = va_name_idx_maps[ str_names[2] ]
+plt.imshow(out['prob'][0, idx], plt.cm.hot)
 
 plt.show()
 
