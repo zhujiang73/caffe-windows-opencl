@@ -4,7 +4,4 @@
 
   Based on BVLC caffe https://github.com/BVLC/caffe/tree/opencl 
 
-  caffe model: SqueezeNet  https://github.com/DeepScale/SqueezeNet
-
-
 
