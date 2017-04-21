@@ -17,7 +17,7 @@ if (NOT __ViennaCL_INCLUDED) # guard against multiple includes
 
     ExternalProject_Add(ViennaCL
       PREFIX ${ViennaCL_PREFIX}
-      SOURCE_DIR  "${PROJECT_SOURCE_DIR}/src/ViennaCL"
+      SOURCE_DIR  "${PROJECT_SOURCE_DIR}/src/viennacl"
       INSTALL_DIR ${ViennaCL_INSTALL}
       CMAKE_ARGS -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
                  -DCMAKE_INSTALL_PREFIX=${ViennaCL_INSTALL}
