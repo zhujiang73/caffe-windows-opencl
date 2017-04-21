@@ -47,9 +47,9 @@ def show_data(str_title, data_fp, padsize=1, padval=0):
 	# plt.rcParams['image.interpolation'] = 'nearest'
 	plt.rcParams['image.cmap'] = 'gray'
 
-set_gpu = 1
+set_gpu_mode = 1
 
-if set_gpu:
+if set_gpu_mode:
 	caffe.set_mode_gpu()
    	caffe.set_device(0)
    	#caffe.set_device(1)
