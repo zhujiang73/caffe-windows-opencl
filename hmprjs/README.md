@@ -5,17 +5,9 @@ heatmaps.py  screenshot:
 
 DataSet Images Directory:
 
-...\places_train: 
+...\places_train:   cars  fashions  places
 
-  cars
-  fashions
-  places
-
-...\places_test:
-
-  cars
-  fashions
-  places
+...\places_test:    cars  fashions  places
 
 
 
@@ -34,6 +26,7 @@ train caffemodel:
 
 
 heatmaps:
+
 ...\caffe-windows-opencl\hmprjs> python  heatmaps.py
 
 
