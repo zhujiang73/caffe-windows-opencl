@@ -3,21 +3,17 @@ heatmaps.py  screenshot:
 ![](heatmaps_2008_001042.jpg)
 
 
-DataSet Images:
+DataSet Images Directory:
 
-dir d:\caffe_net\images\places_train 
-2017/04/29  21:21    <DIR>          .
-2017/04/29  21:21    <DIR>          ..
-2017/04/30  01:25    <DIR>          cars
-2017/04/30  01:32    <DIR>          fashions
-2017/04/29  21:31    <DIR>          places
+...\places_train: 
+  cars
+  fashions
+  places
 
-dir d:\caffe_net\images\places_test
-2017/04/29  21:20    <DIR>          .
-2017/04/29  21:20    <DIR>          ..
-2017/04/30  01:25    <DIR>          cars
-2017/04/30  01:32    <DIR>          fashions
-2017/04/29  21:31    <DIR>          places
+...\places_test
+  cars
+  fashions
+  places
 
 
 
