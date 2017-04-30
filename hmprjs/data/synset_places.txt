@@ -1,0 +1,3 @@
+n01  car
+n02  fashion
+n03  place
