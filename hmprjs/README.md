@@ -10,7 +10,7 @@ DataSet Images Directory:
   fashions
   places
 
-...\places_test
+...\places_test:
   cars
   fashions
   places
