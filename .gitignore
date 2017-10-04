@@ -67,6 +67,10 @@ Makefile.config
 data/
 examples/
 models/
+train_lmdb/
+test_lmdb/
+train.txt
+val.txt
 *.caffemodel
 *.caffemodel.h5
 *.solverstate
