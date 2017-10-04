@@ -67,7 +67,7 @@ Makefile.config
 images/
 data/
 examples/
-#models/
+models/
 train_lmdb/
 test_lmdb/
 train.txt
