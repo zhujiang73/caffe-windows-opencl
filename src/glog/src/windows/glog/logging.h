@@ -938,13 +938,7 @@ struct CrashReason;
 bool IsFailureSignalHandlerInstalled();
 }  // namespace glog_internal_namespace_
 
-#define GOOGLE_GLOG_COMPILE_ASSERT(expr, msg) \
-  typedef google::glog_internal_namespace_::CompileAssert<(bool(expr))> msg[bool(expr) ? 1 : -1]
-
 #define LOG_EVERY_N(severity, n)                                        \
-  GOOGLE_GLOG_COMPILE_ASSERT(google::GLOG_ ## severity < \
-                             google::NUM_SEVERITIES,     \
-                             INVALID_REQUESTED_LOG_SEVERITY);           \
   SOME_KIND_OF_LOG_EVERY_N(severity, (n), google::LogMessage::SendToLog)
 
 #define SYSLOG_EVERY_N(severity, n) \
@@ -1117,6 +1111,12 @@ class GOOGLE_GLOG_DLL_DECL LogStreamBuf : public std::streambuf {
   LogStreamBuf(char *buf, int len) {
     setp(buf, buf + len - 2);
   }
+
+  // Resets the buffer. Useful if we reuse it by means of TLS.
+  void reset() {
+     setp(pbase(), epptr());
+  }
+
   // This effectively ignores overflow.
   virtual int_type overflow(int_type ch) {
     return ch;
@@ -1179,6 +1179,7 @@ public:
     size_t pcount() const { return streambuf_.pcount(); }
     char* pbase() const { return streambuf_.pbase(); }
     char* str() const { return pbase(); }
+    void reset() { streambuf_.reset(); }
 
   private:
     LogStream(const LogStream&);
@@ -1250,7 +1251,7 @@ public:
   void SendToSyslogAndLog();  // Actually dispatch to syslog and the logs
 
   // Call abort() or similar to perform LOG(FATAL) crash.
-  static void  Fail();
+  static void __declspec(noreturn) Fail();
 
   std::ostream& stream();
 
@@ -1298,7 +1299,7 @@ class GOOGLE_GLOG_DLL_DECL LogMessageFatal : public LogMessage {
  public:
   LogMessageFatal(const char* file, int line);
   LogMessageFatal(const char* file, int line, const CheckOpString& result);
-   ~LogMessageFatal();
+  __declspec(noreturn) ~LogMessageFatal();
 };
 
 // A non-macro interface to the log facility; (useful
@@ -1313,6 +1314,35 @@ inline void LogAtLevel(int const severity, std::string const &msg) {
 // LOG macros, 2. this macro can be used as C++ stream.
 #define LOG_AT_LEVEL(severity) google::LogMessage(__FILE__, __LINE__, severity).stream()
 
+// Check if it's compiled in C++11 mode.
+//
+// GXX_EXPERIMENTAL_CXX0X is defined by gcc and clang up to at least
+// gcc-4.7 and clang-3.1 (2011-12-13).  __cplusplus was defined to 1
+// in gcc before 4.7 (Crosstool 16) and clang before 3.1, but is
+// defined according to the language version in effect thereafter.
+// Microsoft Visual Studio 14 (2015) sets __cplusplus==199711 despite
+// reasonably good C++11 support, so we set LANG_CXX for it and
+// newer versions (_MSC_VER >= 1900).
+#if (defined(__GXX_EXPERIMENTAL_CXX0X__) || __cplusplus >= 201103L || \
+     (defined(_MSC_VER) && _MSC_VER >= 1900))
+// Helper for CHECK_NOTNULL().
+//
+// In C++11, all cases can be handled by a single function. Since the value
+// category of the argument is preserved (also for rvalue references),
+// member initializer lists like the one below will compile correctly:
+//
+//   Foo()
+//     : x_(CHECK_NOTNULL(MethodReturningUniquePtr())) {}
+template <typename T>
+T CheckNotNull(const char* file, int line, const char* names, T&& t) {
+ if (t == nullptr) {
+   LogMessageFatal(file, line, new std::string(names));
+ }
+ return std::forward<T>(t);
+}
+
+#else
+
 // A small helper for CHECK_NOTNULL().
 template <typename T>
 T* CheckNotNull(const char *file, int line, const char *names, T* t) {
@@ -1321,6 +1351,7 @@ T* CheckNotNull(const char *file, int line, const char *names, T* t) {
   }
   return t;
 }
+#endif
 
 // Allow folks to put a counter in the LOG_EVERY_X()'ed messages. This
 // only works if ostream is a LogStream. If the ostream is not a
@@ -1602,7 +1633,7 @@ class GOOGLE_GLOG_DLL_DECL NullStreamFatal : public NullStream {
   NullStreamFatal() { }
   NullStreamFatal(const char* file, int line, const CheckOpString& result) :
       NullStream(file, line, result) { }
-   ~NullStreamFatal() throw () { _exit(1); }
+  __declspec(noreturn) ~NullStreamFatal() throw () { _exit(1); }
 };
 
 // Install a signal handler that will dump signal information and a stack

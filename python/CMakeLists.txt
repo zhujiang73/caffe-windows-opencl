@@ -13,7 +13,7 @@ if(WIN32)
 endif()
 #target_include_directories(pycaffe PUBLIC ${PYTHON_INCLUDE_DIRS} ${NUMPY_INCLUDE_DIR})
 #target_link_libraries(pycaffe PUBLIC ${Caffe_LINK} ${PYTHON_LIBRARIES})
-target_link_libraries(pycaffe PUBLIC -LC:/msys64/mingw64/lib/ -LC:/mingw/lib/ ${CMAKE_BINARY_DIR}/lib/libcaffe.dll.a ${CMAKE_BINARY_DIR}/external/glog-install/lib/libglog.dll.a -lgflags -lprotobuf -lpython2.7 -lboost_python-mt -lboost_system-mt -lboost_thread-mt -lboost_filesystem-mt -lboost_chrono-mt -lboost_date_time-mt -lboost_atomic-mt)
+target_link_libraries(pycaffe PUBLIC -LC:/msys64/mingw64/lib/ -LC:/mingw/lib/ ${CMAKE_BINARY_DIR}/lib/libcaffe.dll.a ${CMAKE_BINARY_DIR}/external/glog-install/lib/libglog.dll.a -lgflags -lprotobuf -lpython3.6 -lboost_python3-mt -lboost_system-mt -lboost_thread-mt -lboost_filesystem-mt -lboost_chrono-mt -lboost_date_time-mt -lboost_atomic-mt)
 
 if(UNIX OR APPLE)
     set(__linkname "${PROJECT_SOURCE_DIR}/python/caffe/_caffe.so")

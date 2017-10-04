@@ -8,13 +8,13 @@ if (POLICY CMP0063)
   cmake_policy (SET CMP0063 NEW)
 endif (POLICY CMP0063)
 
-project (google-glog)
+project (glog)
 
-enable_testing ()
+#enable_testing ()
 
 set (GLOG_MAJOR_VERSION 0)
 set (GLOG_MINOR_VERSION 3)
-set (GLOG_PATCH_VERSION 4)
+set (GLOG_PATCH_VERSION 5)
 
 set (GLOG_VERSION
   ${GLOG_MAJOR_VERSION}.${GLOG_MINOR_VERSION}.${GLOG_PATCH_VERSION})
@@ -26,9 +26,11 @@ set (CPACK_PACKAGE_VERSION_MINOR ${GLOG_MINOR_VERSION})
 set (CPACK_PACKAGE_VERSION_PATCH ${GLOG_PATCH_VERSION})
 set (CPACK_PACKAGE_VERSION ${GLOG_VERSION})
 
+set (BUILD_SHARED_LIBS TRUE)
+
 option (WITH_GFLAGS "Use gflags" ON)
-option (WITH_THREADS "Enable multithreading support" ON)
-option (BUILD_SHARED_LIBS "build shared libs" ON)
+option (WITH_THREADS "Enable multithreading support" OFF)
+option (WITH_TLS "Enable Thread Local Storage (TLS) support" ON)
 
 list (APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
@@ -46,11 +48,12 @@ include (CMakePackageConfigHelpers)
 include (CPack)
 include (CTest)
 include (DetermineGflagsNamespace)
+include (GNUInstallDirs)
 
 set (CMAKE_THREAD_PREFER_PTHREAD 1)
 
 if (WITH_GFLAGS)
-  find_package (gflags)
+  find_package (gflags 2.2.0)
 
   if (gflags_FOUND)
     set (HAVE_LIB_GFLAGS 1)
@@ -190,6 +193,31 @@ namespace Outer { namespace Inner { int i = 0; }}
 using namespace Outer::Inner;;
 int main() { return i; }
 " HAVE_NAMESPACES)
+
+check_cxx_source_compiles ("
+__declspec(thread) int tls;
+int main() { }
+" HAVE_MSVC_TLS)
+
+check_cxx_source_compiles ("
+thread_local int tls;
+int main() { }
+" HAVE_CXX11_TLS)
+
+check_cxx_source_compiles ("
+__attribute__((thread)) int tls;
+int main() { }
+" HAVE_CYGWIN_TLS)
+
+if (WITH_TLS)
+  if (HAVE_CYGWIN_TLS)
+    set (GLOG_THREAD_LOCAL_STORAGE "__attribute__((thread))")
+  elseif (HAVE_MSVC_TLS)
+    set (GLOG_THREAD_LOCAL_STORAGE "__declspec(thread)")
+  elseif (HAVE_CXX11_TLS)
+    set (GLOG_THREAD_LOCAL_STORAGE thread_local)
+  endif (HAVE_CYGWIN_TLS)
+endif (WITH_TLS)
 
 set (_PC_FIELDS
   "gregs[REG_PC]"
@@ -365,9 +393,9 @@ set (GLOG_SRCS
   src/vlog_is_on.cc
 )
 
-if (HAVE_PTHREAD)
+if (HAVE_PTHREAD OR WIN32)
   list (APPEND GLOG_SRCS src/signalhandler.cc)
-endif (HAVE_PTHREAD)
+endif (HAVE_PTHREAD OR WIN32)
 
 if (WIN32)
   list (APPEND GLOG_SRCS
@@ -397,9 +425,10 @@ if (WIN32 AND HAVE_SNPRINTF)
     HAVE_SNPRINTF)
 endif (WIN32 AND HAVE_SNPRINTF)
 
+target_link_libraries (glog PUBLIC msvcrt Kernel32 Dbghelp)
+
 if (gflags_FOUND)
-  target_include_directories (glog PUBLIC $<BUILD_INTERFACE:${gflags_INCLUDE_DIR}>)
-  target_link_libraries (glog PUBLIC ${gflags_LIBRARIES})
+  target_link_libraries (glog PUBLIC gflags)
 
   if (NOT BUILD_SHARED_LIBS)
     # Don't use __declspec(dllexport|dllimport) if this is a static build
@@ -416,10 +445,15 @@ endif (WIN32)
 
 set_target_properties (glog PROPERTIES PUBLIC_HEADER "${GLOG_PUBLIC_H}")
 
+set (_glog_CMake_BINDIR ${CMAKE_INSTALL_BINDIR})
+set (_glog_CMake_INCLUDE_DIR ${CMAKE_INSTALL_INCLUDEDIR})
+set (_glog_CMake_LIBDIR ${CMAKE_INSTALL_LIBDIR})
+set (_glog_CMake_INSTALLDIR ${_glog_CMake_LIBDIR}/cmake/glog)
+
 target_include_directories (glog BEFORE PUBLIC
   "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>"
   "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>"
-  "$<INSTALL_INTERFACE:include>"
+  "$<INSTALL_INTERFACE:${_glog_CMake_INCLUDE_DIR}>"
   PRIVATE ${CMAKE_CURRENT_BINARY_DIR}
   PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
@@ -456,110 +490,23 @@ if (HAVE_EXECINFO_H)
   set (HAVE_STACKTRACE 1)
 endif (HAVE_EXECINFO_H)
 
+if (WIN32)
+  set (HAVE_STACKTRACE 1)
+  set (HAVE_SYMBOLIZE 1)
+endif (WIN32)
+
 if (UNIX OR (APPLE AND HAVE_DLADDR))
   set (HAVE_SYMBOLIZE 1)
 endif (UNIX OR (APPLE AND HAVE_DLADDR))
 
 # Unit testing
 
-if (BUILD_TESTING)
-  add_executable (logging_unittest
-    src/logging_unittest.cc
-  )
-
-  target_link_libraries (logging_unittest PRIVATE glog)
-
-  add_executable (stl_logging_unittest
-    src/stl_logging_unittest.cc
-  )
-
-  target_link_libraries (stl_logging_unittest PRIVATE glog)
-
-  if (HAVE_NO_DEPRECATED)
-    set_property (TARGET stl_logging_unittest APPEND PROPERTY COMPILE_OPTIONS
-      -Wno-deprecated)
-  endif (HAVE_NO_DEPRECATED)
-
-  if (HAVE_UNORDERED_MAP AND HAVE_UNORDERED_SET)
-    target_compile_definitions (stl_logging_unittest PRIVATE
-      GLOG_STL_LOGGING_FOR_UNORDERED)
-  endif (HAVE_UNORDERED_MAP AND HAVE_UNORDERED_SET)
-
-  if (HAVE_TR1_UNORDERED_MAP AND HAVE_TR1_UNORDERED_SET)
-    target_compile_definitions (stl_logging_unittest PRIVATE
-      GLOG_STL_LOGGING_FOR_TR1_UNORDERED)
-  endif (HAVE_TR1_UNORDERED_MAP AND HAVE_TR1_UNORDERED_SET)
-
-  if (HAVE_EXT_HASH_MAP AND HAVE_EXT_HASH_SET)
-    target_compile_definitions (stl_logging_unittest PRIVATE
-      GLOG_STL_LOGGING_FOR_EXT_HASH)
-  endif (HAVE_EXT_HASH_MAP AND HAVE_EXT_HASH_SET)
-
-  if (HAVE_EXT_SLIST)
-    target_compile_definitions (stl_logging_unittest PRIVATE
-      GLOG_STL_LOGGING_FOR_EXT_SLIST)
-  endif (HAVE_EXT_SLIST)
-
-  if (HAVE_SYMBOLIZE)
-    add_executable (symbolize_unittest
-      src/symbolize_unittest.cc
-    )
-
-    target_link_libraries (symbolize_unittest PRIVATE glog)
-  endif (HAVE_SYMBOLIZE)
-
-  add_executable (demangle_unittest
-    src/demangle_unittest.cc
-  )
-
-  target_link_libraries (demangle_unittest PRIVATE glog)
-
-  if (HAVE_STACKTRACE)
-    add_executable (stacktrace_unittest
-      src/stacktrace_unittest.cc
-    )
-
-    target_link_libraries (stacktrace_unittest PRIVATE glog)
-  endif (HAVE_STACKTRACE)
-
-  add_executable (utilities_unittest
-    src/utilities_unittest.cc
-  )
-
-  target_link_libraries (utilities_unittest PRIVATE glog)
-
-  if (HAVE_STACKTRACE AND HAVE_SYMBOLIZE)
-    add_executable (signalhandler_unittest
-      src/signalhandler_unittest.cc
-    )
-
-    target_link_libraries (signalhandler_unittest PRIVATE glog)
-  endif (HAVE_STACKTRACE AND HAVE_SYMBOLIZE)
-
-  add_test (NAME demangle COMMAND demangle_unittest)
-  add_test (NAME logging COMMAND logging_unittest)
-
-  if (TARGET signalhandler_unittest)
-    add_test (NAME signalhandler COMMAND signalhandler_unittest)
-  endif (TARGET signalhandler_unittest)
-
-  if (TARGET stacktrace_unittest)
-    add_test (NAME stacktrace COMMAND stacktrace_unittest)
-  endif (TARGET stacktrace_unittest)
-
-  add_test (NAME stl_logging COMMAND stl_logging_unittest)
-
-  if (TARGET symbolize_unittest)
-    add_test (NAME symbolize COMMAND symbolize_unittest)
-  endif (TARGET symbolize_unittest)
-endif (BUILD_TESTING)
-
 install (TARGETS glog
   EXPORT glog-targets
-  RUNTIME DESTINATION bin
-  PUBLIC_HEADER DESTINATION include/glog
-  LIBRARY DESTINATION lib
-  ARCHIVE DESTINATION lib)
+  RUNTIME DESTINATION ${_glog_CMake_BINDIR}
+  PUBLIC_HEADER DESTINATION ${_glog_CMake_INCLUDE_DIR}/glog
+  LIBRARY DESTINATION ${_glog_CMake_LIBDIR}
+  ARCHIVE DESTINATION ${_glog_CMake_LIBDIR})
 
 if (gflags_FOUND)
   set (gflags_DEPENDENCY "find_dependency (gflags ${gflags_VERSION})")
@@ -567,7 +514,7 @@ endif (gflags_FOUND)
 
 configure_package_config_file (glog-config.cmake.in
   ${CMAKE_CURRENT_BINARY_DIR}/glog-config.cmake
-  INSTALL_DESTINATION lib/cmake/glog
+  INSTALL_DESTINATION ${_glog_CMake_INSTALLDIR}
   NO_CHECK_REQUIRED_COMPONENTS_MACRO)
 
 write_basic_package_version_file (glog-config-version.cmake VERSION
@@ -579,6 +526,7 @@ export (PACKAGE glog)
 install (FILES
   ${CMAKE_CURRENT_BINARY_DIR}/glog-config.cmake
   ${CMAKE_CURRENT_BINARY_DIR}/glog-config-version.cmake
-  DESTINATION lib/cmake/glog)
+  DESTINATION ${_glog_CMake_INSTALLDIR})
 
-install (EXPORT glog-targets NAMESPACE glog:: DESTINATION lib/cmake/glog)
+install (EXPORT glog-targets NAMESPACE glog:: DESTINATION
+  ${_glog_CMake_INSTALLDIR})

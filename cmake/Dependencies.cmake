@@ -273,29 +273,8 @@ if(BUILD_python)
     # use python3
     find_package(PythonInterp 3.0)
     find_package(PythonLibs 3.0)
-    find_package(NumPy 1.7.1)
-    # Find the matching boost python implementation
-    set(version ${PYTHONLIBS_VERSION_STRING})
-
-    STRING( REGEX REPLACE "[^0-9]" "" boost_py_version ${version} )
-    find_package(Boost 1.62 COMPONENTS "python-py${boost_py_version}")
-    set(Boost_PYTHON_FOUND ${Boost_PYTHON-PY${boost_py_version}_FOUND})
-
-    while(NOT "${version}" STREQUAL "" AND NOT Boost_PYTHON_FOUND)
-      STRING( REGEX REPLACE "([0-9.]+).[0-9]+" "\\1" version ${version} )
-
-      STRING( REGEX REPLACE "[^0-9]" "" boost_py_version ${version} )
-      find_package(Boost 1.62 COMPONENTS "python-py${boost_py_version}")
-      set(Boost_PYTHON_FOUND ${Boost_PYTHON-PY${boost_py_version}_FOUND})
-
-      STRING( REGEX MATCHALL "([0-9.]+).[0-9]+" has_more_version ${version} )
-      if("${has_more_version}" STREQUAL "")
-        break()
-      endif()
-    endwhile()
-    if(NOT Boost_PYTHON_FOUND)
-      find_package(Boost 1.62 COMPONENTS python)
-    endif()
+    find_package(NumPy 1.7.1)    
+    find_package(Boost 1.62 COMPONENTS python)
   else()
     # disable Python 3 search
     find_package(PythonInterp 2.7)
@@ -303,6 +282,7 @@ if(BUILD_python)
     find_package(NumPy 1.7.1)
     find_package(Boost 1.62 COMPONENTS python)
   endif()
+
   if(PYTHONLIBS_FOUND AND NUMPY_FOUND AND Boost_PYTHON_FOUND)
     set(HAVE_PYTHON TRUE)
     if(Boost_USE_STATIC_LIBS AND MSVC)

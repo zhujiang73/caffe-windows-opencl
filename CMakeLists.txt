@@ -4,8 +4,8 @@ cmake_minimum_required(VERSION 3.4)
 project(Caffe C CXX)
 
 # ---[ Caffe version
-set(CAFFE_TARGET_VERSION "1.0.0-rc5_mingw" CACHE STRING "Caffe logical version")
-set(CAFFE_TARGET_SOVERSION "1.0.0-rc5_mingw" CACHE STRING "Caffe soname version")
+set(CAFFE_TARGET_VERSION "1.0.0_mingw" CACHE STRING "Caffe logical version")
+set(CAFFE_TARGET_SOVERSION "1.0.0_mingw" CACHE STRING "Caffe soname version")
 add_definitions(-DCAFFE_VERSION=${CAFFE_TARGET_VERSION})
 
 # This code is taken from https://github.com/sh1r0/caffe-android-lib
@@ -25,8 +25,9 @@ endif()
 # ---[ Using cmake scripts and modules
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/Modules)
 
-set(PYTHON_LIBRARY        "C:/msys64/mingw64/lib/libpython2.7.dll.a")
-set(PYTHON_INCLUDE_DIR    "C:/msys64/mingw64/include/python2.7")
+set(PYTHON_EXECUTABLE     "C:/msys64/mingw64/bin/python3.6.exe")
+set(PYTHON_INCLUDE_DIR    "C:/msys64/mingw64/include/python3.6m")
+set(PYTHON_LIBRARY        "C:/msys64/mingw64/lib/libpython3.6.dll.a")
 
 include(ExternalProject)
 
@@ -61,7 +62,7 @@ else()
   caffe_option(BUILD_SHARED_LIBS "Build shared libraries" ON)
 endif()
 caffe_option(BUILD_python "Build Python wrapper" ON)
-set(python_version "2" CACHE STRING "Specify which Python version to use")
+set(python_version "3" CACHE STRING "Specify which Python version to use")
 caffe_option(BUILD_matlab "Build Matlab wrapper" OFF)
 caffe_option(BUILD_docs   "Build documentation" ON IF UNIX OR APPLE)
 caffe_option(BUILD_python_layer "Build the Caffe Python layer" ON)
@@ -182,11 +183,7 @@ endif()
 add_subdirectory(src/gtest)
 add_subdirectory(src/caffe)
 add_subdirectory(tools)
-add_subdirectory(examples)
-# This code is taken from https://github.com/sh1r0/caffe-android-lib
-#add_subdirectory(android)
 add_subdirectory(python)
-#add_subdirectory(matlab)
 add_subdirectory(docs)
 
 # ---[ Linter target

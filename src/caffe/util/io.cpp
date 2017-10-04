@@ -55,7 +55,7 @@ void WriteProtoToTextFile(const Message& proto, const char* filename) {
 }
 
 bool ReadProtoFromBinaryFile(const char* filename, Message* proto) {
-#if defined (_WIN64)  // for MSC compiler binary flag needs to be specified
+#if defined (_WIN64)  
   int_tp fd = open(filename, O_RDONLY | O_BINARY);
 #else
   int_tp fd = open(filename, O_RDONLY);

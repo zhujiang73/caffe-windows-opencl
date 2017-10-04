@@ -3,12 +3,13 @@ file(GLOB proto_files proto/*.proto)
 caffe_protobuf_generate_cpp_py(${proto_gen_folder} proto_srcs proto_hdrs proto_python ${proto_files})
 
 # include python files either to force generation
-add_library(proto STATIC ${proto_hdrs} ${proto_srcs} ${proto_python})
-caffe_default_properties(proto)
-#target_link_libraries(proto PUBLIC ${PROTOBUF_LIBRARIES})
-#target_include_directories(proto PUBLIC ${PROTOBUF_INCLUDE_DIR})
 
-list(INSERT Caffe_LINKER_LIBS 0 PUBLIC proto) # note, crucial to prepend!
+add_library(caffeproto STATIC ${proto_hdrs} ${proto_srcs} ${proto_python})
+caffe_default_properties(caffeproto)
+#target_link_libraries(caffeproto PUBLIC ${PROTOBUF_LIBRARIES})
+#target_include_directories(caffeproto PUBLIC ${PROTOBUF_INCLUDE_DIR})
+
+list(INSERT Caffe_LINKER_LIBS 0 PUBLIC caffeproto) # note, crucial to prepend!
 
 # --[ Caffe library
 
@@ -100,7 +101,7 @@ configure_file(${caffe_export_hdr_in} ${caffe_export_hdr})
 # ---[ Install
 install(DIRECTORY ${Caffe_INCLUDE_DIR}/caffe DESTINATION include)
 install(FILES ${proto_hdrs} DESTINATION include/caffe/proto)
-install(TARGETS caffe proto EXPORT CaffeTargets DESTINATION lib)
+install(TARGETS caffe caffeproto EXPORT CaffeTargets DESTINATION lib)
 if(MSVC AND NOT BUILD_SHARED_LIBS)
   install(FILES ${caffe_export_hdr} ${caffe_symbols_hdr} DESTINATION include/caffe)
 endif()
