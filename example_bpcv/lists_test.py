@@ -8,7 +8,7 @@ caffe_imgs_fn = ".\\data\\val.txt"
 mydirs = []
 
 for parent,dirnames,filenames in os.walk(rootdir): #{
-        for dirname in dirnames: #{
+	for dirname in dirnames: #{
 		mydirs.append(dirname)
         #}
 #}
@@ -32,7 +32,7 @@ for i in range(0, len(mydirs)):
 num_lens = []
 for mydir in mydirs:	
 	file_lists = list_dicts[mydir]
-        num_len = len(file_lists)
+	num_len = len(file_lists)
 	num_lens.append(num_len)
 
 file_imgs = open(caffe_imgs_fn, 'w')
