@@ -75,7 +75,7 @@ val.txt
 *.caffemodel.h5
 *.solverstate
 *.solverstate.h5
-*.binaryproto
+#*.binaryproto
 *.mdb
 
 # build, distribute, and bins (+ python proto bindings)
