@@ -61,7 +61,7 @@ else:
 	print("CPU mode")
 
 net_file=".\\data\\caffenet_places.prototxt"
-#caffe_model=".\\models\\caffenet_train_quick_iter_3000.caffemodel"
+#caffe_model=".\\models\\caffenet_train_quick_iter_5000.caffemodel"
 caffe_model=".\\models\\caffenet_train_quick_iter_6000.caffemodel"
 
 mean_bin=".\\data\\mean.binaryproto"
@@ -77,9 +77,9 @@ net_full_conv = caffe.Net(net_file, caffe_model, caffe.TEST)
 # load input and configure preprocessing
 
 #str_img_fn = ".\\imgs\\2008_001042.jpg";  h_res = int(800) ;  w_res = int(960)
-str_img_fn = ".\\imgs\\fish-bike.jpg"; h_res = int(500) ;  w_res = int(720) 
+#str_img_fn = ".\\imgs\\fish-bike.jpg"; h_res = int(500) ;  w_res = int(720) 
 #str_img_fn = ".\\imgs\\SSDB00253.jpg";   h_res = int(1200);  w_res = int(1600)
-#str_img_fn = ".\\imgs\\SSDB00348.jpg";   h_res = int(900) ;  w_res = int(1200)
+str_img_fn = ".\\imgs\\SSDB00266.jpg";   h_res = int(480) ;  w_res = int(600)
 
 img = caffe.io.load_image(str_img_fn, color = False)
 img_show = skio.imread(str_img_fn)
